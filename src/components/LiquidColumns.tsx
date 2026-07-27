@@ -239,22 +239,16 @@ export function LiquidColumns() {
         </h1>
       </div>
 
-      {/* Sits over the docked cube: the way back out, plus Escape. */}
+      {/* The docked cube is the way back out, plus Escape. Nothing is drawn here —
+          the cube is its own affordance, this is only the hit area over it, live
+          once it has landed so its flight cannot be cut short half way. */}
       <button
         type="button"
         onClick={close}
         aria-label="Close"
-        className="group absolute left-0 top-0 flex h-40 w-40 cursor-pointer items-end justify-center pb-3 transition-opacity duration-500"
-        style={{
-          opacity: settled ? 1 : 0,
-          pointerEvents: settled ? "auto" : "none",
-          transitionDelay: settled ? `${SHUTTER_MS + 600}ms` : "0ms",
-        }}
-      >
-        <span className="font-mono text-[10px] tracking-[0.2em] text-neutral-400 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
-          CLOSE
-        </span>
-      </button>
+        className="absolute left-0 top-0 h-40 w-40 cursor-pointer"
+        style={{ pointerEvents: settled ? "auto" : "none" }}
+      />
     </main>
   );
 }
