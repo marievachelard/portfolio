@@ -68,8 +68,46 @@ body {
   animation: arrive 600ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+/* The counter. One strip of digits per position, stacked one per line behind a
+   window one line tall.
+
+   The roll is timed, not scrubbed. It fires when the arriving picture crosses the
+   handover line and then runs on its own clock, alongside the wording — the number
+   is not being dragged, it is answering the photograph. `both` holds its last frame,
+   which is what leaves the strip showing the digit it landed on. */
+.reel-window {
+  display: inline-block;
+  height: 1em;
+  overflow: hidden;
+  vertical-align: baseline;
+}
+
+.reel-cells {
+  display: block;
+}
+
+.reel-cells > span {
+  display: block;
+  height: 1em;
+  line-height: 1em;
+}
+
+.reel-roll {
+  animation: reel 650ms cubic-bezier(0.32, 0.72, 0.2, 1) both;
+}
+
+@keyframes reel {
+  from {
+    transform: translateY(calc(var(--reel-from) * -1em));
+  }
+  to {
+    transform: translateY(calc(var(--reel-to) * -1em));
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .arrive {
+  .arrive,
+  .reel-roll {
     animation-duration: 1ms;
   }
 }

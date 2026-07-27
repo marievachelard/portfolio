@@ -70,18 +70,19 @@ const SCROLL_PER_ENTRY = 500;
  */
 const SCROLL_SMOOTH = 0.0009;
 /**
- * When the text changes hands, measured as how far the arriving picture still has
- * to travel before it is home — in gaps, so 0.16 means a sixth of a screen short of
- * the frame. The wording belongs to its entry for the whole crossing and only hands
- * over as the next picture lands at the height it will rest at.
+ * Where the change fires, as how far the arriving picture still has to travel before
+ * it is home — in gaps, so 0.16 is a sixth of a screen short of the frame: as it
+ * lands, or just before.
  *
- * TEXT_SPAN is the fade on either side of that point. It cannot exceed TEXT_SWAP,
- * and here it is exactly it: past that the text would still be on its way back once
- * the picture had settled, and would never reach full strength at rest. So this is
- * as slow as the fade goes without moving the moment it changes hands.
+ * Everything in the text column ignores the scroll and waits for this line to be
+ * crossed. Then it plays, on its own clock: the wording out, swapped, and back, and
+ * the number turning over its notch. A picture being dragged is one thing; the words
+ * naming it are another, and following the hand made them feel tied to the wheel
+ * rather than to the photograph.
  */
-const TEXT_SWAP = 0.16;
-const TEXT_SPAN = 0.16;
+const HANDOVER = 0.16;
+const TEXT_OUT_MS = 200;
+const TEXT_IN_MS = 400;
 
 /**
  * When the open section lands, counted from the click. The title, the entry and the
@@ -135,10 +136,14 @@ export function LiquidColumns() {
   // are still out at this point — they only come back once it has landed.
   const [closing, setClosing] = useState(false);
   const stageTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Which experience is settled on. The position itself is not state: it changes
-  // every frame, and re-rendering the page at that rate to move two pictures would
-  // be absurd.
-  const [entryIndex, setEntryIndex] = useState(0);
+  // Which experience is settled on, and which one it came from — the counter needs
+  // the digit it is leaving to know where to start. The position itself is not state:
+  // it changes every frame, and re-rendering the page at that rate to move two
+  // pictures would be absurd.
+  const [entry, setEntry] = useState({ index: 0, from: 0 });
+  // The wording trails the change by its own fade-out: it leaves on the old entry,
+  // and only once it is gone does it swap and come back.
+  const [textIndex, setTextIndex] = useState(0);
   const mainRef = useRef<HTMLElement>(null);
   /** Where the list actually is, and where the wheel has asked it to go. */
   const at = useRef(0);
@@ -146,6 +151,12 @@ export function LiquidColumns() {
   const rafId = useRef(0);
   /** Which way the list was last asked to go; the arriving picture depends on it. */
   const dir = useRef(1);
+
+  useEffect(() => {
+    if (textIndex === entry.index) return;
+    const t = setTimeout(() => setTextIndex(entry.index), TEXT_OUT_MS);
+    return () => clearTimeout(t);
+  }, [entry.index, textIndex]);
 
   // Wheel-dragged, not wheel-triggered. The deltas move a continuous position, the
   // position chases it with an ease, and everything is placed from it — so the
@@ -170,11 +181,6 @@ export function LiquidColumns() {
       const forward = dir.current >= 0;
       const frac = p - Math.floor(p);
       const arriving = forward ? 1 - frac : frac;
-      el.style.setProperty(
-        "--fade",
-        Math.min(1, Math.abs(arriving - TEXT_SWAP) / TEXT_SPAN).toFixed(3),
-      );
-
       // Which two entries this stretch is between. Clamped, so at either end of the
       // list the pair collapses and nothing changes hands.
       const leavingIdx = Math.min(
@@ -186,10 +192,12 @@ export function LiquidColumns() {
         Math.max(0, leavingIdx + (forward ? 1 : -1)),
       );
 
-      // The wording swaps at the middle of its own blank stretch, which is the only
-      // place it can change without one line replacing another in plain sight.
-      const idx = arriving < TEXT_SWAP ? towardIdx : leavingIdx;
-      setEntryIndex((was) => (was === idx ? was : idx));
+      // Crossing the line is the whole trigger: nothing here is scrubbed. Whatever
+      // the wheel is doing, the text column is either before this point or after it.
+      const idx = arriving < HANDOVER ? towardIdx : leavingIdx;
+      setEntry((was) =>
+        was.index === idx ? was : { index: idx, from: was.index },
+      );
     };
 
     const tick = (now: number) => {
@@ -392,8 +400,11 @@ export function LiquidColumns() {
     r.target.crystal = true;
     openedRef.current = hovered.current;
     setOpened(hovered.current);
-    // A section always opens on its first entry.
-    setEntryIndex(0);
+    // A section always opens on its first entry. `from` of -1 is the arrival: it
+    // makes the counter roll its one notch onto 01 rather than sitting there already
+    // showing it, and it is what tells the strip to wait for the reveal.
+    setEntry({ index: 0, from: -1 });
+    setTextIndex(0);
     at.current = 0;
     want.current = 0;
     dir.current = 1;
@@ -407,7 +418,14 @@ export function LiquidColumns() {
   // The section is open and staying open: the cube is parked in the corner, so the
   // title and the way back out belong on screen. False the instant it sets off home.
   const settled = opened !== null && !closing;
-  const shown = EXPERIENCE[entryIndex];
+  const shown = EXPERIENCE[textIndex];
+  /** The wording has caught up with the change, so it belongs on screen. */
+  const textSettled = textIndex === entry.index;
+  const digits = pad(entry.index + 1).split("");
+  const leaving = pad(entry.from + 1).split("");
+  const countDir = Math.sign(entry.index - entry.from);
+  /** Arriving from the grid: the counter rolls on a clock, not on a gesture. */
+  const openRoll = entry.from < 0;
 
   return (
     <main ref={mainRef} className="relative h-dvh w-full overflow-hidden bg-white">
@@ -481,13 +499,39 @@ export function LiquidColumns() {
           {opened !== null && COLUMNS[opened] === "Experience" && (
             <span className="font-mono text-[10px] tracking-[0.2em] tabular-nums text-neutral-400 sm:text-xs">
               [{" "}
-              {/* The number that changes takes the description's fade, off the same
-                  variable and on the same window — one movement for the whole text
-                  column rather than a mechanism of its own. The brackets and the
-                  total do not move, so they do not fade. */}
-              <span style={{ opacity: "var(--fade, 1)" }}>
-                {pad(entryIndex + 1)}
-              </span>{" "}
+              {/* Turning over rather than fading: the number has its own way of
+                  changing, on the same window as the description so the two are one
+                  movement. The brackets and the total hold still. */}
+              {digits.map((d, i) => {
+                const was = Number(leaving[i]);
+                const step =
+                  countDir >= 0
+                    ? (Number(d) - was + 10) % 10
+                    : -((was - Number(d) + 10) % 10);
+                return (
+                  <span key={i} className="reel-window">
+                    <span
+                      // Keyed on the digit, so the roll replays when this position
+                      // changes and a position that does not change never moves.
+                      key={d}
+                      className="reel-cells reel-roll"
+                      style={
+                        {
+                          "--reel-from": 10 + was,
+                          "--reel-to": 10 + was + step,
+                          // Arriving from the grid it waits for the title it sits on;
+                          // otherwise it fires on the crossing, with the wording.
+                          animationDelay: openRoll ? `${ARRIVE_MS}ms` : "0ms",
+                        } as React.CSSProperties
+                      }
+                    >
+                      {Array.from({ length: 30 }, (_, n) => (
+                        <span key={n}>{n % 10}</span>
+                      ))}
+                    </span>
+                  </span>
+                );
+              })}{" "}
               / {pad(EXPERIENCE.length)} ]
             </span>
           )}
@@ -508,10 +552,16 @@ export function LiquidColumns() {
           // would win over the opacity the other two need.
           <div className="mt-12 sm:mt-16" style={exitFade(closing)}>
             <div className="arrive" style={{ animationDelay: `${ARRIVE_MS}ms` }}>
-            {/* Faded straight off the scroll position, so it thins out as the list
-                is dragged and is already gone at the halfway point where the
-                wording swaps. */}
-            <article style={{ opacity: "var(--fade, 1)" }}>
+            {/* Out quickly, back more slowly, and the wording only swaps once it has
+                gone — so the old line and the new one are never both legible. */}
+            <article
+              style={{
+                opacity: textSettled ? 1 : 0,
+                transition: `opacity ${
+                  textSettled ? TEXT_IN_MS : TEXT_OUT_MS
+                }ms linear`,
+              }}
+            >
               <h2 className="text-lg font-medium tracking-tight text-neutral-900 sm:text-2xl">
                 {shown.role}
               </h2>
@@ -569,7 +619,7 @@ export function LiquidColumns() {
               >
                 <Image
                   src={item.image}
-                  alt={i === entryIndex ? item.imageAlt : ""}
+                  alt={i === entry.index ? item.imageAlt : ""}
                   fill
                   sizes="34vw"
                   placeholder="blur"
