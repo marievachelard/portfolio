@@ -70,6 +70,55 @@ button {
   );
 }
 
+/* ------------------------------- the reading glass ---------------------------------
+   A copy of the strip in grey, showing only through a disc at the pointer, so what is
+   under the glass is black and white and the rest of the photograph keeps its colour.
+   The disc is the whole of it — no outline. What marks the pointer over a photograph is
+   the colour leaving it.
+
+   The radius is a registered property so that it can be interpolated: transitioning
+   `clip-path` itself would carry the centre with it, and the disc would trail a frame
+   or two behind the hand. Registering the radius alone lets it grow smoothly while the
+   position stays exactly on the pointer.
+
+   It grows from four pixels rather than from nothing, because four pixels is the radius
+   of the dot that the pointer is the rest of the time. So the swap is not a
+   disappearance and a bloom, it is the dot itself opening out — and closing back down.
+
+   Idle it also carries no filter: a greyscale filter over four photographs is rasterised
+   whether any of it ends up on screen or not, and this sits on the page for as long as
+   the section is open. The filter is held a moment past the pointer leaving, otherwise
+   colour would snap back before the disc had finished closing.
+
+   `--lx`/`--ly` are the pointer in the frame's own coordinates, written straight from
+   the pointer handler. */
+@property --lens-r {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 4px;
+}
+
+.lens {
+  position: absolute;
+  inset: 0;
+  clip-path: circle(var(--lens-r) at var(--lx, -999px) var(--ly, -999px));
+  transition: --lens-r 220ms cubic-bezier(0.33, 1, 0.68, 1);
+}
+
+.lens-open {
+  --lens-r: 32px;
+}
+
+.lens-grey {
+  filter: grayscale(1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lens {
+    transition-duration: 1ms;
+  }
+}
+
 /* Opening a section, in two beats.
 
    Keyframes rather than transitions because all of this is mounted at the moment the

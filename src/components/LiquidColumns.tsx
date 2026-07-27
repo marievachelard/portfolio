@@ -134,6 +134,10 @@ const BLOCK_GAP = 64;
 const BLOCK_H = 278;
 const IMAGE_REST_Y = TITLE_TOP + TITLE_LINE + BLOCK_GAP + BLOCK_H / 2;
 
+/** How long the grey is held after the pointer has gone, so the disc can finish
+    closing before the colour comes back. A little over the transition in the CSS. */
+const LENS_HOLD = 280;
+
 export function LiquidColumns() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
@@ -171,6 +175,13 @@ export function LiquidColumns() {
   const [textIndex, setTextIndex] = useState(0);
   const mainRef = useRef<HTMLElement>(null);
   /** Where the list actually is, and where the wheel has asked it to go. */
+  const frameRef = useRef<HTMLDivElement>(null);
+  const frameRect = useRef<DOMRect | null>(null);
+  const overFrame = useRef(false);
+  const [lensOn, setLensOn] = useState(false);
+  const [lensGrey, setLensGrey] = useState(false);
+  const lensTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const at = useRef(0);
   const want = useRef(0);
   const rafId = useRef(0);
@@ -304,6 +315,8 @@ export function LiquidColumns() {
       rects.current = Array.from(grid.children).map((el) =>
         el.getBoundingClientRect(),
       );
+      // The photograph is a share of the viewport width, so it moves on a resize too.
+      frameRect.current = null;
       // Guarded: measure() also runs from a pointermove that missed, and that is no
       // place to be setting state on every event.
       const next = dockGeometry(window.innerWidth, window.innerHeight);
@@ -346,6 +359,53 @@ export function LiquidColumns() {
   //
   // Doing it all at once — which is what this used to do — throws the sequence away
   // and just snaps the page back.
+
+  // The photograph takes no pointer events of its own — it must not swallow the wheel
+  // that changes experience, nor the click that closes the section — so being over it
+  // is worked out from its rectangle rather than from an enter event.
+  //
+  // The rectangle is cached: it only moves on a resize, and its rise on arrival is a
+  // transform on the child, which the parent's layout box does not see. So it is
+  // already the resting frame from the first frame of the entrance.
+  //
+  // Position goes straight into custom properties, never into state — this runs on
+  // every pointer move. React only hears about crossing the edge.
+  const lens = (clientX: number, clientY: number) => {
+    const frame = frameRef.current;
+    if (!frame) return;
+    const box = (frameRect.current ??= frame.getBoundingClientRect());
+    const x = clientX - box.left;
+    const y = clientY - box.top;
+    frame.style.setProperty("--lx", x + "px");
+    frame.style.setProperty("--ly", y + "px");
+    const over = x >= 0 && x <= box.width && y >= 0 && y <= box.height;
+    if (over === overFrame.current) return;
+    overFrame.current = over;
+    setLensOn(over);
+    holdGrey(over);
+  };
+
+  /** The filter follows the disc in and lags it out, by a little more than the disc
+      takes to close. Dropped straight away and the colour would snap back under a disc
+      still shrinking. */
+  const holdGrey = (over: boolean) => {
+    if (lensTimer.current) clearTimeout(lensTimer.current);
+    if (over) {
+      setLensGrey(true);
+      return;
+    }
+    lensTimer.current = setTimeout(() => setLensGrey(false), LENS_HOLD);
+  };
+
+  /** Off the page, or the frame is about to move or go: forget where it was. */
+  const dropLens = () => {
+    frameRect.current = null;
+    if (!overFrame.current) return;
+    overFrame.current = false;
+    setLensOn(false);
+    holdGrey(false);
+  };
+
   const close = () => {
     const r = renderer.current;
     if (!r || opened === null || closing) return;
@@ -356,6 +416,9 @@ export function LiquidColumns() {
     // so nothing else would ever clear it. It also unwinds the cube's tumble, which
     // has no business being held while the cube flies home.
     hoverCube(false);
+    // The picture is on its way out, so the glass over it goes now rather than being
+    // left ringing empty white once it has gone.
+    dropLens();
     setClosing(true);
 
     const letters = COLUMNS[opened].length;
@@ -401,6 +464,7 @@ export function LiquidColumns() {
   useEffect(() => {
     return () => {
       if (stageTimer.current) clearTimeout(stageTimer.current);
+      if (lensTimer.current) clearTimeout(lensTimer.current);
     };
   }, []);
 
@@ -411,6 +475,7 @@ export function LiquidColumns() {
     if (!r || e.pointerType === "touch") return;
     r.target.pointerX = e.clientX;
     r.target.pointerY = e.clientY;
+    lens(e.clientX, e.clientY);
     if (openedRef.current !== null) return;
 
     const hit = (x: number) =>
@@ -442,6 +507,9 @@ export function LiquidColumns() {
   };
 
   const release = () => {
+    // Before the guard: the pointer leaving the page has to take the glass with it
+    // whether a section is open or not.
+    dropLens();
     const r = renderer.current;
     if (!r || openedRef.current !== null) return;
     r.target.active = false;
@@ -482,6 +550,24 @@ export function LiquidColumns() {
   const typedAt = TYPE_START + Math.max(0, label.length - 1) * TYPE_STEP;
   const restAt = typedAt + REST_GAP;
 
+  /** The strip of photographs, laid out from `--p`. Drawn twice: once in colour, and
+      once in grey under the reading glass, which has to be the same strip in the same
+      places or the two would slide apart mid-crossing. The copy is silent — the alt
+      text belongs to the picture that is actually being shown, and only once. */
+  const strip = (silent: boolean) =>
+    EXPERIENCE.map((item, i) => (
+      <div key={i} className="frame-layer" style={{ "--i": i } as React.CSSProperties}>
+        <Image
+          src={item.image}
+          alt={!silent && i === entry.index ? item.imageAlt : ""}
+          fill
+          sizes="34vw"
+          placeholder="blur"
+          className="object-cover"
+        />
+      </div>
+    ));
+
   const shown = EXPERIENCE[textIndex];
   /** The wording has caught up with the change, so it belongs on screen. */
   const textSettled = textIndex === entry.index;
@@ -490,7 +576,14 @@ export function LiquidColumns() {
   const countDir = Math.sign(entry.index - entry.from);
 
   return (
-    <main ref={mainRef} className="relative h-dvh w-full overflow-hidden bg-white">
+    <main
+      ref={mainRef}
+      className="relative h-dvh w-full overflow-hidden bg-white"
+      // The dot is not kept alongside the glass: it becomes it. The disc opens from
+      // exactly the dot's radius, so hiding the real pointer here is not a
+      // disappearance — there is no moment with nothing under the hand.
+      style={{ cursor: lensOn ? "none" : undefined }}
+    >
       <canvas
         ref={canvasRef}
         aria-hidden
@@ -679,6 +772,7 @@ export function LiquidColumns() {
           already almost touch, and moving it left there would land it on the words. */}
       {opened !== null && COLUMNS[opened] === "Experience" && (
         <div
+          ref={frameRef}
           className="pointer-events-none absolute right-10 hidden -translate-y-1/2 sm:block lg:right-40"
           // Its resting height, and the same figure handed to the CSS: the spacing
           // between two photographs is worked out from it, since a strip that rests
@@ -699,22 +793,22 @@ export function LiquidColumns() {
                 Nothing is keyed or replayed: drag the position and the whole strip
                 moves with it. The frame does not clip them — only the page does —
                 so a picture is visible for the whole of its crossing. */}
-            {EXPERIENCE.map((item, i) => (
-              <div
-                key={i}
-                className="frame-layer"
-                style={{ "--i": i } as React.CSSProperties}
-              >
-                <Image
-                  src={item.image}
-                  alt={i === entry.index ? item.imageAlt : ""}
-                  fill
-                  sizes="34vw"
-                  placeholder="blur"
-                  className="object-cover"
-                />
-              </div>
-            ))}
+            {strip(false)}
+
+            {/* The same strip again in grey, showing only through a disc at the pointer.
+                Stacked over the colour rather than swapped for it, so the two never have
+                to be kept in step — and mounted whether the glass is up or not, because
+                a copy that appeared on hover would come up through its blur placeholder
+                the first time. Idle it is clipped to nothing and carries no filter, so
+                it costs a paint of nothing at all. */}
+            <div
+              aria-hidden
+              className={`lens${lensOn ? " lens-open" : ""}${
+                lensGrey ? " lens-grey" : ""
+              }`}
+            >
+              {strip(true)}
+            </div>
           </div>
         </div>
       )}
@@ -764,7 +858,6 @@ export function LiquidColumns() {
       >
         [ CLOSE ]
       </span>
-
     </main>
   );
 }
