@@ -331,6 +331,12 @@ export function LiquidColumns() {
     const r = renderer.current;
     if (!r || opened === null || closing) return;
     if (stageTimer.current) clearTimeout(stageTimer.current);
+    // First off the stage, before the block even starts to drop. It has to be done
+    // here: the hit area goes inert on the same frame, and pointerleave is not
+    // reliably fired for a pointer left sitting on something that stopped listening —
+    // so nothing else would ever clear it. It also unwinds the cube's tumble, which
+    // has no business being held while the cube flies home.
+    hoverCube(false);
     setClosing(true);
 
     const letters = COLUMNS[opened].length;
@@ -354,10 +360,6 @@ export function LiquidColumns() {
         // refilling it on the next mouse move would be a flicker for nothing.
         rr.target.returning = false;
         rr.target.crystal = false;
-        // The pointer may well be sitting where the cube used to be; it is not on it
-        // any more, and pointerleave does not fire for a thing that stopped existing.
-        rr.target.cubeHover = false;
-        setCubeHovered(false);
         openedRef.current = null;
         // A click without an intervening move must not reopen the column it just left.
         hovered.current = -1;
@@ -722,7 +724,9 @@ export function LiquidColumns() {
           top: dock.y,
           transform: "translateY(-50%)",
           opacity: cubeHovered ? 1 : 0,
-          transition: "opacity 260ms linear",
+          // Slower in than out on purpose: leaving, it has to be gone before the block
+          // below has moved far, or it reads as lingering rather than as first out.
+          transition: `opacity ${cubeHovered ? 260 : 160}ms linear`,
         }}
       >
         [ CLOSE ]
