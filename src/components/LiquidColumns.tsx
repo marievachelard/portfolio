@@ -71,16 +71,17 @@ const SCROLL_PER_ENTRY = 500;
 const SCROLL_SMOOTH = 0.0009;
 /**
  * Where the change fires, as how far the arriving picture still has to travel before
- * it is home — in gaps, so 0.16 is a sixth of a screen short of the frame: as it
- * lands, or just before.
+ * it is home — in gaps, so 0.1 is a tenth of the way short of it: around fifty
+ * pixels on a laptop, early enough that the change has begun as the picture comes to
+ * rest rather than after it.
  *
- * Everything in the text column ignores the scroll and waits for this line to be
- * crossed. Then it plays, on its own clock: the wording out, swapped, and back, and
- * the number turning over its notch. A picture being dragged is one thing; the words
- * naming it are another, and following the hand made them feel tied to the wheel
- * rather than to the photograph.
+ * Everything in the text column ignores the scroll and waits for that. Then it plays
+ * on its own clock: the wording out, swapped, and back, and the number turning over
+ * its notch. A picture being dragged is one thing; the words naming it are another,
+ * and following the hand made them feel tied to the wheel rather than to the
+ * photograph.
  */
-const HANDOVER = 0.16;
+const HANDOVER = 0.1;
 const TEXT_OUT_MS = 200;
 const TEXT_IN_MS = 400;
 
@@ -180,7 +181,11 @@ export function LiquidColumns() {
       // to the nearest entry, which would have it fading the moment anything moved.
       const forward = dir.current >= 0;
       const frac = p - Math.floor(p);
-      const arriving = forward ? 1 - frac : frac;
+      // Sitting exactly on a whole number going backwards, the picture that would
+      // arrive next is a full gap below, not none — without this the reckoning reads
+      // it as already home and hands over to the wrong entry. Harmless while the
+      // line sat at 0, wrong as soon as it does not.
+      const arriving = forward ? 1 - frac : frac === 0 ? 1 : frac;
       // Which two entries this stretch is between. Clamped, so at either end of the
       // list the pair collapses and nothing changes hands.
       const leavingIdx = Math.min(
