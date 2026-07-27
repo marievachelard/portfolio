@@ -47,16 +47,35 @@ body {
   transform: translateY(calc((var(--i) - var(--p, 0)) * (50vh + 75%)));
 }
 
-/* Arriving with the section title.
-   A keyframe rather than a transition, because these are mounted at the moment the
+/* Opening a section, in two beats.
+
+   Keyframes rather than transitions because all of this is mounted at the moment the
    section opens: an element that appears already at its final value has nothing to
-   transition from, so it simply shows. That is why the entry and its photograph used
-   to be on screen a beat before the title they belong with. An animation runs on
-   mount, and `both` holds the first frame through the delay. */
+   transition from, so it would simply show. An animation runs on mount, and `both`
+   holds the first frame through the delay — which is what lets one delay per letter
+   spell out a sequence.
+
+   First the title types itself, a letter at a time. Eighty milliseconds each is short
+   enough to read as a key being struck rather than as a fade, without the harshness of
+   a hard step. */
+@keyframes type-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.type-in {
+  animation: type-in 80ms linear both;
+}
+
+/* Then everything else rises into place from below, once the line has finished. */
 @keyframes arrive {
   from {
     opacity: 0;
-    transform: translateY(14px);
+    transform: translateY(64px);
   }
   to {
     opacity: 1;
@@ -65,7 +84,7 @@ body {
 }
 
 .arrive {
-  animation: arrive 600ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: arrive 700ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 /* The counter. One strip of digits per position, stacked one per line behind a
@@ -106,6 +125,7 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .type-in,
   .arrive,
   .reel-roll {
     animation-duration: 1ms;

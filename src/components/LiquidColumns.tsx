@@ -94,32 +94,19 @@ const TEXT_OUT_MS = 200;
 const TEXT_IN_MS = 400;
 
 /**
- * When the open section lands, counted from the click. The title, the entry and the
- * photograph all arrive on this beat: they are one thing, and staggering them read
- * as the page assembling itself in pieces.
+ * Opening a section, counted from the click. The title is struck out a letter at a
+ * time from TYPE_START, and everything that belongs under it waits for the last
+ * letter plus a beat before rising into place. So the length of the sequence follows
+ * the length of the word — see `typedAt` below.
  */
-const ARRIVE_MS = SHUTTER_MS + 480;
+const TYPE_START = SHUTTER_MS + 380;
+const TYPE_STEP = 45;
+const REST_GAP = 120;
 
 /** Leaving, for the parts that are mounted only while a section is open. */
 const exitFade = (closing: boolean) => ({
   opacity: closing ? 0 : 1,
   transition: "opacity 300ms linear",
-});
-
-/**
- * The section title rising into place once the cube has parked, and leaving with no
- * delay at all the moment it sets off home — last in, first out.
- *
- * Opacity carries the same curve as the transform, and as the `arrive` keyframe the
- * entry and photograph use: on the default ease it reached full strength noticeably
- * later than they did, and the three are meant to be one movement.
- */
-const reveal = (shown: boolean, delay: number) => ({
-  opacity: shown ? 1 : 0,
-  transform: shown ? "translateY(0)" : "translateY(14px)",
-  transition:
-    "opacity 600ms cubic-bezier(0.22, 1, 0.36, 1), transform 600ms cubic-bezier(0.22, 1, 0.36, 1)",
-  transitionDelay: shown ? `${SHUTTER_MS + delay}ms` : "0ms",
 });
 
 export function LiquidColumns() {
@@ -452,6 +439,11 @@ export function LiquidColumns() {
   // The section is open and staying open: the cube is parked in the corner, so the
   // title and the way back out belong on screen. False the instant it sets off home.
   const settled = opened !== null && !closing;
+  const label = opened === null ? "" : COLUMNS[opened];
+  /** When the last letter of the title has landed, and when the rest follows it. */
+  const typedAt = TYPE_START + Math.max(0, label.length - 1) * TYPE_STEP;
+  const restAt = typedAt + REST_GAP;
+
   const shown = EXPERIENCE[textIndex];
   /** The wording has caught up with the change, so it belongs on screen. */
   const textSettled = textIndex === entry.index;
@@ -519,17 +511,32 @@ export function LiquidColumns() {
         aria-hidden={!settled}
         className="pointer-events-none absolute left-5 top-36 sm:left-10 sm:top-48"
       >
+        {/* The wrapper only handles leaving. The letters handle arriving, one delay
+            each — an animation on mount, which a transition could not do here. */}
         <div
           className="flex items-baseline gap-3 sm:gap-4"
-          style={reveal(settled, 480)}
+          style={exitFade(closing)}
         >
           <h1 className="text-4xl font-medium tracking-tight text-neutral-900 sm:text-6xl">
-            {opened === null ? "" : COLUMNS[opened]}
+            {label.split("").map((letter, i) => (
+              <span
+                key={i}
+                className="type-in"
+                style={{ animationDelay: `${TYPE_START + i * TYPE_STEP}ms` }}
+              >
+                {letter}
+              </span>
+            ))}
           </h1>
           {/* Sits on the title's own baseline, so it reads as an annotation to it
               rather than as a second line. */}
           {opened !== null && COLUMNS[opened] === "Experience" && (
-            <span className="font-mono text-[10px] tracking-[0.2em] tabular-nums text-neutral-400 sm:text-xs">
+            <span
+              className="type-in font-mono text-[10px] tracking-[0.2em] tabular-nums text-neutral-400 sm:text-xs"
+              // Lands as the last letter does: it annotates the line, so it belongs
+              // to the line rather than to the block that rises after it.
+              style={{ animationDelay: `${typedAt}ms` }}
+            >
               [{" "}
               {/* Turning over rather than fading: the number has its own way of
                   changing, on the same window as the description so the two are one
@@ -580,7 +587,7 @@ export function LiquidColumns() {
           // They cannot share an element — an animation holding its last frame
           // would win over the opacity the other two need.
           <div className="mt-12 sm:mt-16" style={exitFade(closing)}>
-            <div className="arrive" style={{ animationDelay: `${ARRIVE_MS}ms` }}>
+            <div className="arrive" style={{ animationDelay: `${restAt}ms` }}>
             {/* Out quickly, back more slowly, and the wording only swaps once it has
                 gone — so the old line and the new one are never both legible. */}
             <article
@@ -634,7 +641,7 @@ export function LiquidColumns() {
               object-cover crops the top and bottom instead of squashing. */}
           <div
             className="arrive relative aspect-[1.85/1] w-[34vw] max-w-[560px]"
-            style={{ animationDelay: `${ARRIVE_MS}ms` }}
+            style={{ animationDelay: `${restAt}ms` }}
           >
             {/* Every entry is laid out from the same position, a screen apart.
                 Nothing is keyed or replayed: drag the position and the whole strip
