@@ -144,6 +144,21 @@ const ROCK_MAX = 0.11;
  */
 const FILL_MARGIN = 1.2;
 
+/**
+ * Where the cube parks and how far it visibly reaches, CSS px. Exported because the
+ * page has to put things next to it: duplicating the arithmetic on the DOM side is
+ * how a label ends up drifting off the thing it labels on a short window.
+ */
+export function dockGeometry(cssW: number, cssH: number) {
+  const unit = Math.min(DOCK_UNIT, cssW * 0.13);
+  const reach = unit * CUBE_HALF * 1.45;
+  const inset = Math.max(
+    reach + 14,
+    Math.min(DOCK_INSET, cssW * 0.16, cssH * 0.16),
+  );
+  return { x: inset, y: inset, unit, reach };
+}
+
 function compile(gl: WebGL2RenderingContext, type: number, src: string) {
   const sh = gl.createShader(type)!;
   gl.shaderSource(sh, src);
@@ -307,12 +322,10 @@ export function createBlobRenderer(canvas: HTMLCanvasElement): BlobRenderer | nu
     // Docked: park in the top-left corner. The cube shrinks with the viewport, and
     // the inset is floored by how far its tilted corners actually project — that is
     // what stops it hanging off the left edge on a phone.
-    const dockUnit = Math.min(DOCK_UNIT, cssW * 0.13);
-    const dockReach = dockUnit * CUBE_HALF * 1.45;
-    const inset = Math.max(dockReach + 14, Math.min(DOCK_INSET, cssW * 0.16, cssH * 0.16));
-    const dockX = inset;
-    const dockY = inset;
-    const wantUnit = target.docked ? dockUnit : wantW / 2;
+    const dock = dockGeometry(cssW, cssH);
+    const dockX = dock.x;
+    const dockY = dock.y;
+    const wantUnit = target.docked ? dock.unit : wantW / 2;
 
     if (!seeded && target.active) {
       eased.x = target.colCenterX;

@@ -2,7 +2,11 @@
 
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
-import { createBlobRenderer, type BlobRenderer } from "@/lib/blobRenderer";
+import {
+  createBlobRenderer,
+  dockGeometry,
+  type BlobRenderer,
+} from "@/lib/blobRenderer";
 // Static import, so Next reads the dimensions at build time and generates the blur
 // placeholder itself. The filename carries the Unsplash attribution — keep it.
 import clouds from "@/images/experience/viktor-mogilat-jYbBn4m3sW0-unsplash.jpg";
@@ -137,6 +141,10 @@ export function LiquidColumns() {
   // are still out at this point — they only come back once it has landed.
   const [closing, setClosing] = useState(false);
   const stageTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [cubeHovered, setCubeHovered] = useState(false);
+  // Where the cube parks, read from the renderer's own reckoning so the label beside
+  // it cannot drift off it on a short window.
+  const [dock, setDock] = useState(() => dockGeometry(1440, 900));
   // Which experience is settled on, and which one it came from — the counter needs
   // the digit it is leaving to know where to start. The position itself is not state:
   // it changes every frame, and re-rendering the page at that rate to move two
@@ -280,6 +288,10 @@ export function LiquidColumns() {
       rects.current = Array.from(grid.children).map((el) =>
         el.getBoundingClientRect(),
       );
+      // Guarded: measure() also runs from a pointermove that missed, and that is no
+      // place to be setting state on every event.
+      const next = dockGeometry(window.innerWidth, window.innerHeight);
+      setDock((was) => (was.x === next.x && was.reach === next.reach ? was : next));
     };
     remeasure.current = measure;
     measure();
@@ -304,6 +316,7 @@ export function LiquidColumns() {
   }, []);
 
   const hoverCube = (on: boolean) => {
+    setCubeHovered(on);
     const r = renderer.current;
     if (!r) return;
     r.target.cubeHover = on;
@@ -337,6 +350,7 @@ export function LiquidColumns() {
       // The pointer may well be sitting where the cube used to be; it is not on it
       // any more, and pointerleave does not fire for a thing that stopped existing.
       rr.target.cubeHover = false;
+      setCubeHovered(false);
       openedRef.current = null;
       // A click without an intervening move must not reopen the column it just left.
       hovered.current = -1;
@@ -660,6 +674,27 @@ export function LiquidColumns() {
         className="absolute left-0 top-0 h-40 w-40 cursor-pointer"
         style={{ pointerEvents: settled ? "auto" : "none" }}
       />
+
+      {/* Named only while the pointer is on it. Placed off the cube's own parked
+          geometry — just past how far its tilted corners reach, centred on its
+          middle — so it sits beside the cube and not beside the hit area, which is
+          a square much larger than the cube itself.
+
+          Marked aria-hidden: the button already carries the accessible name, and
+          this would only say it twice. */}
+      <span
+        aria-hidden
+        className="pointer-events-none absolute font-mono text-[10px] tracking-[0.2em] text-neutral-400 sm:text-xs"
+        style={{
+          left: dock.x + dock.reach + 16,
+          top: dock.y,
+          transform: "translateY(-50%)",
+          opacity: cubeHovered ? 1 : 0,
+          transition: "opacity 260ms linear",
+        }}
+      >
+        [ CLOSE ]
+      </span>
 
     </main>
   );
