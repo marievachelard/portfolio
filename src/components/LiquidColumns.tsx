@@ -71,6 +71,33 @@ const EXPERIENCE = [
 /** Two digits, so a counter never changes width as it climbs. */
 const pad = (n: number) => String(n).padStart(2, "0");
 
+/**
+ * The counter is one strip of digits per position, and what is rendered is how far
+ * each strip has been wound — a single running figure, not a pair of ends. A
+ * transition on that figure picks up from wherever the strip actually is, so an entry
+ * that changes while the last roll is still running carries on from there instead of
+ * snapping back to the digit it started from. Winding on rather than resetting is
+ * also what takes 9 to 0 forwards instead of spinning back through eight digits.
+ *
+ * A strip is thirty cells of `n % 10`, so cell 10 is a zero: an entry's resting wind
+ * is ten plus its digit, and every step after that keeps the same remainder.
+ */
+const reelStart = (index: number) =>
+  pad(index + 1)
+    .split("")
+    .map((d) => 10 + Number(d));
+
+const reelWind = (wound: number[], from: number, to: number) => {
+  const next = pad(to + 1);
+  const prev = pad(from + 1);
+  const forward = to >= from;
+  return wound.map((n, i) => {
+    const d = Number(next[i]);
+    const w = Number(prev[i]);
+    return n + (forward ? (d - w + 10) % 10 : -((w - d + 10) % 10));
+  });
+};
+
 /** Wheel delta that amounts to one whole experience. */
 const SCROLL_PER_ENTRY = 500;
 /**
@@ -170,11 +197,10 @@ export function LiquidColumns() {
   // Where the cube parks, read from the renderer's own reckoning so the label beside
   // it cannot drift off it on a short window.
   const [dock, setDock] = useState(() => dockGeometry(1440, 900));
-  // Which experience is settled on, and which one it came from — the counter needs
-  // the digit it is leaving to know where to start. The position itself is not state:
-  // it changes every frame, and re-rendering the page at that rate to move two
-  // pictures would be absurd.
-  const [entry, setEntry] = useState({ index: 0, from: 0 });
+  // Which experience is settled on, and how far the counter's strips have been wound
+  // to say so. The position of the photographs is not state: it changes every frame,
+  // and re-rendering the page at that rate to move two pictures would be absurd.
+  const [entry, setEntry] = useState(() => ({ index: 0, reel: reelStart(0) }));
   // The wording trails the change by its own fade-out: it leaves on the old entry,
   // and only once it is gone does it swap and come back.
   const [textIndex, setTextIndex] = useState(0);
@@ -194,8 +220,6 @@ export function LiquidColumns() {
   const at = useRef(0);
   const want = useRef(0);
   const rafId = useRef(0);
-  /** Which way the list was last asked to go; the arriving picture depends on it. */
-  const dir = useRef(1);
 
   useEffect(() => {
     if (textIndex === entry.index) return;
@@ -207,9 +231,15 @@ export function LiquidColumns() {
   // position chases it with an ease, and everything is placed from it — so the
   // pictures follow the hand instead of playing a canned animation at it.
   //
-  // Nothing rounds it afterwards. Stopping between two experiences leaves it
-  // between two: the ease is only there to smooth the hand, not to pull the list
-  // anywhere it was not put.
+  // Nothing rounds it, ever. The wheel is the only thing that moves the strip, and it
+  // stops where the hand stopped — between two experiences if that is where the hand
+  // left it. The ease is a lag on the hand, not a destination of its own: it only ever
+  // closes the distance to where the wheel has already asked for.
+  //
+  // Anything that repositions the strip once the wheel has gone quiet has been tried
+  // and is not wanted. A magnet reads as the photograph being taken out of your hands,
+  // whichever entry it picks and however softly it moves — it is movement nobody asked
+  // for, and this page is meant to feel dragged rather than operated.
   useEffect(() => {
     if (opened === null || COLUMNS[opened] !== "Experience") return;
     const last = EXPERIENCE.length - 1;
@@ -220,33 +250,24 @@ export function LiquidColumns() {
       if (!el) return;
       const p = at.current;
       el.style.setProperty("--p", p.toFixed(4));
-      // Which picture is arriving depends on which way the list is going, and how
-      // far it still has to travel is what the text answers to — not the distance
-      // to the nearest entry, which would have it fading the moment anything moved.
-      const forward = dir.current >= 0;
-      const frac = p - Math.floor(p);
-      // Sitting exactly on a whole number going backwards, the picture that would
-      // arrive next is a full gap below, not none — without this the reckoning reads
-      // it as already home and hands over to the wrong entry. Harmless while the
-      // line sat at 0, wrong as soon as it does not.
-      const arriving = forward ? 1 - frac : frac === 0 ? 1 : frac;
-      // Which two entries this stretch is between. Clamped, so at either end of the
-      // list the pair collapses and nothing changes hands.
-      const leavingIdx = Math.min(
-        last,
-        Math.max(0, forward ? Math.floor(p) : Math.ceil(p)),
-      );
-      const towardIdx = Math.min(
-        last,
-        Math.max(0, leavingIdx + (forward ? 1 : -1)),
-      );
-
-      // Crossing the line is the whole trigger: nothing here is scrubbed. Whatever
-      // the wheel is doing, the text column is either before this point or after it.
-      const idx = arriving < HANDOVER ? towardIdx : leavingIdx;
-      setEntry((was) =>
-        was.index === idx ? was : { index: idx, from: was.index },
-      );
+      // Which entry the strip has settled on, read from where the pictures are and
+      // from nothing else. A picture takes the text over once it is within HANDOVER
+      // of home; anywhere between two of them the last one to arrive holds, which is
+      // what keeps the wording from flickering across a crossing.
+      //
+      // Position alone is the point. This used to ask which way the wheel had last
+      // turned and name the entry it was leaving, so the same strip position had two
+      // answers over eight tenths of the gap — and a single stray tick, the kind a
+      // trackpad emits at the tail of a fling, swapped the whole text column and
+      // rolled the counter while the photographs stood still.
+      const nearest = Math.min(last, Math.max(0, Math.round(p)));
+      if (Math.abs(p - nearest) < HANDOVER) {
+        setEntry((was) =>
+          was.index === nearest
+            ? was
+            : { index: nearest, reel: reelWind(was.reel, was.index, nearest) },
+        );
+      }
 
       // The hand can sit perfectly still while a picture slides out from under it, so
       // the glass cannot be left to pointer moves alone: it is asked again on every
@@ -278,7 +299,6 @@ export function LiquidColumns() {
     const onWheel = (e: WheelEvent) => {
       // Clamped rather than wrapped: dragging a list has two ends, and being
       // thrown back to the start mid-gesture is not a thing a list does.
-      if (e.deltaY !== 0) dir.current = Math.sign(e.deltaY);
       want.current = Math.min(
         last,
         Math.max(0, want.current + e.deltaY / SCROLL_PER_ENTRY),
@@ -294,8 +314,14 @@ export function LiquidColumns() {
             ? -1
             : 0;
       if (!step) return;
-      dir.current = step;
-      want.current = Math.min(last, Math.max(0, Math.round(want.current) + step));
+      // The one thing that does land on a whole entry, because a key names one outright
+      // rather than dragging towards it. The wheel never does this.
+      //
+      // The next whole entry that way from wherever the list happens to be sitting.
+      // Rounding first, as this did, skips one from the far half of a gap: asked to
+      // go down from 1.5 it rounded to 2 and then stepped to 3.
+      const whole = step > 0 ? Math.floor(want.current) : Math.ceil(want.current);
+      want.current = Math.min(last, Math.max(0, whole + step));
       run();
     };
 
@@ -568,15 +594,14 @@ export function LiquidColumns() {
     r.target.crystal = true;
     openedRef.current = hovered.current;
     setOpened(hovered.current);
-    // A section always opens on its first entry, and on it already: `from` matching
-    // `index` leaves the counter nothing to roll. It simply appears with the title it
-    // sits on, like the rest of the block — the turn-over is for a change of entry,
-    // and arriving is not one.
-    setEntry({ index: 0, from: 0 });
+    // A section always opens on its first entry, and on it already: the counter mounts
+    // with its strips already wound to it and nothing to transition from. It simply
+    // appears with the title it sits on, like the rest of the block — the turn-over is
+    // for a change of entry, and arriving is not one.
+    setEntry({ index: 0, reel: reelStart(0) });
     setTextIndex(0);
     at.current = 0;
     want.current = 0;
-    dir.current = 1;
     r.wake();
     if (stageTimer.current) clearTimeout(stageTimer.current);
     stageTimer.current = setTimeout(() => {
@@ -613,9 +638,6 @@ export function LiquidColumns() {
   const shown = EXPERIENCE[textIndex];
   /** The wording has caught up with the change, so it belongs on screen. */
   const textSettled = textIndex === entry.index;
-  const digits = pad(entry.index + 1).split("");
-  const leaving = pad(entry.from + 1).split("");
-  const countDir = Math.sign(entry.index - entry.from);
 
   return (
     <main
@@ -719,34 +741,22 @@ export function LiquidColumns() {
               [{" "}
               {/* Turning over rather than fading: the number has its own way of
                   changing, on the same window as the description so the two are one
-                  movement. The brackets and the total hold still. */}
-              {digits.map((d, i) => {
-                const was = Number(leaving[i]);
-                const step =
-                  countDir >= 0
-                    ? (Number(d) - was + 10) % 10
-                    : -((was - Number(d) + 10) % 10);
-                return (
-                  <span key={i} className="reel-window">
-                    <span
-                      // Keyed on the digit, so the roll replays when this position
-                      // changes and a position that does not change never moves.
-                      key={d}
-                      className="reel-cells reel-roll"
-                      style={
-                        {
-                          "--reel-from": 10 + was,
-                          "--reel-to": 10 + was + step,
-                        } as React.CSSProperties
-                      }
-                    >
-                      {Array.from({ length: 30 }, (_, n) => (
-                        <span key={n}>{n % 10}</span>
-                      ))}
-                    </span>
+                  movement. The brackets and the total hold still.
+                  Each strip is placed by how far it has been wound, and a transition
+                  takes it there — so a position that does not change never moves, and
+                  one caught mid-roll by the next entry carries on from where it is. */}
+              {entry.reel.map((n, i) => (
+                <span key={i} className="reel-window">
+                  <span
+                    className="reel-cells"
+                    style={{ "--reel": n } as React.CSSProperties}
+                  >
+                    {Array.from({ length: 30 }, (_, c) => (
+                      <span key={c}>{c % 10}</span>
+                    ))}
                   </span>
-                );
-              })}{" "}
+                </span>
+              ))}{" "}
               / {pad(EXPERIENCE.length)} ]
             </span>
           )}

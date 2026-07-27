@@ -48,8 +48,9 @@ button {
 /* ---------------------------- changing experience ----------------------------
    The wheel does not trigger a change, it drags one. `--p` is the position in the
    list as a fraction — 1.4 is forty percent of the way from the second experience
-   to the third — and every picture is placed from it, so the whole strip follows
-   the hand and settles on the nearest entry when the hand stops.
+   to the third — and every picture is placed from it, so the whole strip follows the
+   hand and stops where the hand stopped. Nothing rounds it: 1.4 is a resting place
+   like any other, with two half photographs in the window.
 
    The spacing is what sets how much white passes between two pictures, and it is set
    by the furthest a neighbour has to go to be out of the window. The strip no longer
@@ -199,8 +200,15 @@ button {
 
    The roll is timed, not scrubbed. It fires when the arriving picture crosses the
    handover line and then runs on its own clock, alongside the wording — the number
-   is not being dragged, it is answering the photograph. `both` holds its last frame,
-   which is what leaves the strip showing the digit it landed on. */
+   is not being dragged, it is answering the photograph.
+
+   A transition on how far the strip is wound, rather than a keyframed pair of ends.
+   Both hold the last position, but only the transition retargets. A scroll quick
+   enough to change entry twice inside the 650ms used to remount the animation on its
+   new pair, which threw the strip straight to the digit the second roll began from —
+   measured at eight and a half pixels of a twelve pixel line inside one frame, most
+   of a digit skipped in a movement whose whole point is that it turns. A transition
+   re-aims from wherever the strip currently is, so nothing is skipped. */
 .reel-window {
   display: inline-block;
   height: 1em;
@@ -210,6 +218,8 @@ button {
 
 .reel-cells {
   display: block;
+  transform: translateY(calc(var(--reel) * -1em));
+  transition: transform 650ms cubic-bezier(0.32, 0.72, 0.2, 1);
 }
 
 .reel-cells > span {
@@ -218,25 +228,15 @@ button {
   line-height: 1em;
 }
 
-.reel-roll {
-  animation: reel 650ms cubic-bezier(0.32, 0.72, 0.2, 1) both;
-}
-
-@keyframes reel {
-  from {
-    transform: translateY(calc(var(--reel-from) * -1em));
-  }
-  to {
-    transform: translateY(calc(var(--reel-to) * -1em));
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .type-in,
   .type-out,
   .arrive,
-  .depart,
-  .reel-roll {
+  .depart {
     animation-duration: 1ms;
+  }
+
+  .reel-cells {
+    transition-duration: 1ms;
   }
 }
