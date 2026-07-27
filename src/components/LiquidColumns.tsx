@@ -24,11 +24,12 @@ const SHUTTER_MS = 650;
  * The summaries run four to five hundred characters. That is past the five lines the
  * measure was first described for, but not past what it holds: 48ch is the width of
  * 48 zeroes, and this face averages narrower than that, so a line takes closer to
- * seventy characters. These land in seven or eight lines and fit as they are.
+ * seventy characters. None of these exceeds seven lines.
  *
- * The ceiling is the window, not the measure. The page does not scroll and what does
- * not fit is clipped rather than reachable, so a summary much longer than these needs
- * the layout rethought rather than the measure nudged.
+ * The ceiling is the window, not the measure. The vertical offsets are fixed, so seven
+ * lines end at 594px whatever the height of the window, and below that much viewport
+ * the text is clipped — the page does not scroll, so what does not fit is lost rather
+ * than reachable. An eighth line costs another 26px of that headroom.
  */
 const EXPERIENCE = [
   {
@@ -61,7 +62,7 @@ const EXPERIENCE = [
     title: "Airbus",
     dates: "2016 – 2017",
     summary:
-      "My first job, and I got to ask a genuinely hard question: how confident should you actually be in a 20-year market share forecast? I rebuilt Airbus' Global Delivery Forecast tool by adding Monte Carlo simulations on top of a deterministic model, to quantify where the uncertainty really came from. Non-linear regression, random forests, time series, and an R Shiny app so the whole strategy team could use it without reading a line of code. This is where I fell in love with statistics that have consequences.",
+      "My first job, and I got to ask a genuinely hard question: how confident should you actually be in a 20-year market share forecast? I rebuilt Airbus' Global Delivery Forecast tool by adding Monte Carlo simulations on top of a deterministic model, to quantify where the uncertainty really came from. Non-linear regression, random forests, time series, and an R Shiny app so the whole strategy team could use it without reading a line of code.",
     image: blooms,
     imageAlt: "Massif de fleurs saisi en filé, rouges et blancs sur vert",
   },
