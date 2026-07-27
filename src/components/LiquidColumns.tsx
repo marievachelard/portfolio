@@ -17,7 +17,15 @@ export function LiquidColumns() {
   const rects = useRef<DOMRect[]>([]);
   const hovered = useRef(-1);
   const [opened, setOpened] = useState<number | null>(null);
-  const dockTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Same value as `opened`, kept for the pointer handlers to read. They can fire in
+  // the same React batch as the click that opened a section, and would still see the
+  // old `opened` through their closure — enough for a stray pointerleave to hand the
+  // body back to the grid and drain the column out from under the cube.
+  const openedRef = useRef<number | null>(null);
+  // The section is open and the cube is on its way back to its column. The shutters
+  // are still out at this point — they only come back once it has landed.
+  const [closing, setClosing] = useState(false);
+  const stageTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -51,20 +59,34 @@ export function LiquidColumns() {
     };
   }, []);
 
+  // open() run backwards, stage for stage. The cube leaves the corner and flies home
+  // first, alone; only once it is back in its column do the shutters return and the
+  // cube melt into it. Doing it all at once — which is what this used to do — throws
+  // the whole sequence away and just snaps the page back.
   const close = () => {
     const r = renderer.current;
-    if (dockTimer.current) clearTimeout(dockTimer.current);
-    dockTimer.current = null;
-    setOpened(null);
-    if (r) {
-      r.target.docked = false;
-      r.target.crystal = false;
-      // Hand control back to whatever the pointer is over; a hover will re-assert
-      // it on the next pointermove.
-      r.target.active = false;
+    if (!r || opened === null || closing) return;
+    if (stageTimer.current) clearTimeout(stageTimer.current);
+    setClosing(true);
+    r.target.docked = false;
+    r.target.returning = true;
+    r.wake();
+
+    stageTimer.current = setTimeout(() => {
+      const rr = renderer.current;
+      setOpened(null);
+      setClosing(false);
+      if (!rr) return;
+      // Home: hand the body back to the grid and let the cube become liquid again,
+      // filling the column it came from. `active` is deliberately left on — the
+      // column is under the pointer's own section, so draining it here and refilling
+      // it on the next mouse move would be a flicker for nothing.
+      rr.target.returning = false;
+      rr.target.crystal = false;
+      openedRef.current = null;
+      // A click without an intervening move must not reopen the column it just left.
       hovered.current = -1;
-      r.wake();
-    }
+    }, SHUTTER_MS);
   };
 
   useEffect(() => {
@@ -74,7 +96,13 @@ export function LiquidColumns() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [opened]);
+  }, [opened, closing]);
+
+  useEffect(() => {
+    return () => {
+      if (stageTimer.current) clearTimeout(stageTimer.current);
+    };
+  }, []);
 
   // Columns are measured before the shutters move, so their rects stay valid while
   // one is open; nothing repositions, they only translate out of frame.
@@ -83,7 +111,7 @@ export function LiquidColumns() {
     if (!r || e.pointerType === "touch") return;
     r.target.pointerX = e.clientX;
     r.target.pointerY = e.clientY;
-    if (opened !== null) return;
+    if (openedRef.current !== null) return;
 
     const i = rects.current.findIndex(
       (rect) => e.clientX >= rect.left && e.clientX < rect.right,
@@ -108,7 +136,7 @@ export function LiquidColumns() {
 
   const release = () => {
     const r = renderer.current;
-    if (!r || opened !== null) return;
+    if (!r || openedRef.current !== null) return;
     r.target.active = false;
     r.target.crystal = false;
     hovered.current = -1;
@@ -121,12 +149,18 @@ export function LiquidColumns() {
     // and only once they are gone does it fly off to the corner. Doing both at
     // once reads as two unrelated things happening rather than one sequence.
     r.target.crystal = true;
+    openedRef.current = hovered.current;
     setOpened(hovered.current);
     r.wake();
-    dockTimer.current = setTimeout(() => {
+    if (stageTimer.current) clearTimeout(stageTimer.current);
+    stageTimer.current = setTimeout(() => {
       if (renderer.current) renderer.current.target.docked = true;
     }, SHUTTER_MS);
   };
+
+  // The section is open and staying open: the cube is parked in the corner, so the
+  // title and the way back out belong on screen. False the instant it sets off home.
+  const settled = opened !== null && !closing;
 
   return (
     <main className="relative h-dvh w-full overflow-hidden bg-white">
@@ -184,15 +218,17 @@ export function LiquidColumns() {
       </div>
 
       {/* The section name reappears as the page title, under the docked cube,
-          timed to land just as the cube finishes its flight. */}
+          timed to land just as the cube finishes its flight. They were the last
+          things to arrive on the way in, so they are the first to go on the way
+          out — they leave with no delay, as the cube sets off home. */}
       <div
-        aria-hidden={opened === null}
+        aria-hidden={!settled}
         className="pointer-events-none absolute left-5 top-36 sm:left-10 sm:top-48"
         style={{
-          opacity: opened === null ? 0 : 1,
-          transform: opened === null ? "translateY(14px)" : "translateY(0)",
+          opacity: settled ? 1 : 0,
+          transform: settled ? "translateY(0)" : "translateY(14px)",
           transition: "opacity 600ms, transform 600ms cubic-bezier(0.22, 1, 0.36, 1)",
-          transitionDelay: opened === null ? "0ms" : `${SHUTTER_MS + 480}ms`,
+          transitionDelay: settled ? `${SHUTTER_MS + 480}ms` : "0ms",
         }}
       >
         <span className="font-mono text-[10px] tracking-[0.2em] tabular-nums text-neutral-400 sm:text-xs">
@@ -210,9 +246,9 @@ export function LiquidColumns() {
         aria-label="Close"
         className="group absolute left-0 top-0 flex h-40 w-40 cursor-pointer items-end justify-center pb-3 transition-opacity duration-500"
         style={{
-          opacity: opened === null ? 0 : 1,
-          pointerEvents: opened === null ? "none" : "auto",
-          transitionDelay: opened === null ? "0ms" : `${SHUTTER_MS + 600}ms`,
+          opacity: settled ? 1 : 0,
+          pointerEvents: settled ? "auto" : "none",
+          transitionDelay: settled ? `${SHUTTER_MS + 600}ms` : "0ms",
         }}
       >
         <span className="font-mono text-[10px] tracking-[0.2em] text-neutral-400 opacity-0 transition-opacity duration-300 group-hover:opacity-100">

@@ -17,6 +17,13 @@ export type BlobTarget = {
    * viewport, so the page only has to flip this.
    */
   docked: boolean;
+  /**
+   * The docked cube on its way home. Its own state rather than just `docked` off,
+   * because the trip back is the one time the body is allowed to travel: without
+   * this the gap between the corner and the column reads as a change of column and
+   * the cube would be cut across instead of flying.
+   */
+  returning: boolean;
   /** hovered column rect, CSS px */
   colCenterX: number;
   colCenterY: number;
@@ -180,6 +187,7 @@ export function createBlobRenderer(canvas: HTMLCanvasElement): BlobRenderer | nu
     active: false,
     crystal: false,
     docked: false,
+    returning: false,
     colCenterX: 0,
     colCenterY: 0,
     colWidth: 0,
@@ -298,6 +306,17 @@ export function createBlobRenderer(canvas: HTMLCanvasElement): BlobRenderer | nu
       // whole viewport, since there is no column left to be contained by.
       eased.x = ease(eased.x, dockX, 0.0009, dt);
       eased.y = ease(eased.y, dockY, 0.0009, dt);
+      clip.left = 0;
+      clip.right = cssW;
+    } else if (target.returning) {
+      // The same flight run backwards: home to its column, growing back as it goes,
+      // still a cube. Same rate as the way out, so it reads as one move reversed.
+      // The clip stays open — the columns it would be cut against are still off
+      // frame, and by the time they are back the cube has arrived.
+      eased.x = ease(eased.x, target.colCenterX, 0.0009, dt);
+      eased.y = ease(eased.y, target.colCenterY, 0.0009, dt);
+      eased.width = ease(eased.width, wantW, 0.0009, dt);
+      eased.height = ease(eased.height, wantH, 0.0009, dt);
       clip.left = 0;
       clip.right = cssW;
     } else if (target.active) {
@@ -427,10 +446,11 @@ export function createBlobRenderer(canvas: HTMLCanvasElement): BlobRenderer | nu
       1 - handoff,
       clip.left,
       clip.right,
-      // Docked, the pointer is somewhere else entirely on the page — letting it aim
-      // the bulge from that far away just makes the cube lurch.
-      target.docked ? 0 : (target.pointerX - eased.x) / unit,
-      target.docked ? 0 : -(target.pointerY - eased.y) / unit,
+      // Docked or on its way home the pointer is somewhere else entirely on the
+      // page — letting it aim the bulge from that far away just makes the cube
+      // lurch, and mid-flight it would lurch differently every frame.
+      target.docked || target.returning ? 0 : (target.pointerX - eased.x) / unit,
+      target.docked || target.returning ? 0 : -(target.pointerY - eased.y) / unit,
     );
   }
 
