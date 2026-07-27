@@ -1,12 +1,95 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { createBlobRenderer, type BlobRenderer } from "@/lib/blobRenderer";
+// Static import, so Next reads the dimensions at build time and generates the blur
+// placeholder itself. The filename carries the Unsplash attribution — keep it.
+import clouds from "@/images/experience/viktor-mogilat-jYbBn4m3sW0-unsplash.jpg";
+import blooms from "@/images/experience/roma-kaiuk-KgEteyimvHs-unsplash.jpg";
 
 const COLUMNS = ["About", "Experience", "Projects", "Contact"];
 
 /** How long the shutters take to clear the frame before the cube is released. */
 const SHUTTER_MS = 650;
+
+/**
+ * Experience entries, newest first. Adding one is one more item here.
+ *
+ * The text below is placeholder, not a real position — it is written the length the
+ * measure is set for so the layout reads true. `summary` is meant to stay inside
+ * five lines: the column is capped at 48 characters, which is roughly that. It is
+ * not truncated, so writing more just makes it taller.
+ */
+const EXPERIENCE = [
+  {
+    role: "Intitulé du poste — Entreprise",
+    /** Digits only, en dash, tabular so a column of them lines up. */
+    dates: "2021 — 2024",
+    summary:
+      "Deux ou trois phrases sur ce qui a été construit, pour qui, et ce que cela a changé. Assez court pour tenir en cinq lignes à cette largeur, assez concret pour qu'on sache de quoi il s'agit sans avoir à demander.",
+    image: clouds,
+    /** Describes the frame, since nothing in the text does it. */
+    imageAlt: "Ciel d'été, gros cumulus, grain de pellicule",
+  },
+  {
+    role: "Deuxième poste — Autre entreprise",
+    dates: "2019 — 2021",
+    summary:
+      "Une description plus courte que la précédente, pour voir comment la transition se comporte quand le bloc de texte change de hauteur d'une expérience à l'autre.",
+    image: blooms,
+    imageAlt: "Massif de fleurs saisi en filé, rouges et blancs sur vert",
+  },
+  {
+    role: "Troisième poste — Encore une autre",
+    dates: "2017 — 2019",
+    summary:
+      "Celle-ci est volontairement plus longue, pour occuper les cinq lignes de la mesure et vérifier que rien ne saute au moment du changement : le texte doit se relayer ligne par ligne, sans que la page se réorganise autour de lui.",
+    image: clouds,
+    imageAlt: "Ciel d'été, gros cumulus, grain de pellicule",
+  },
+  {
+    role: "Premier poste — Là où ça a commencé",
+    dates: "2015 — 2017",
+    summary:
+      "La dernière du lot, courte elle aussi, pour boucler le compteur et revenir à la première.",
+    image: blooms,
+    imageAlt: "Massif de fleurs saisi en filé, rouges et blancs sur vert",
+  },
+];
+
+/** Two digits, so a counter never changes width as it climbs. */
+const pad = (n: number) => String(n).padStart(2, "0");
+
+/** Wheel delta that amounts to one whole experience. */
+const SCROLL_PER_ENTRY = 500;
+/**
+ * Fraction of the distance to the target still left after a second. The position
+ * chases the wheel rather than matching it, which is where the smoothness comes
+ * from; the same frame-rate-independent easing the renderer uses.
+ */
+const SCROLL_SMOOTH = 0.0009;
+/**
+ * How far the list can move off an entry before the text starts to go, as a
+ * fraction of the gap. Below it the wording simply stays: the picture is still
+ * around the height of the text, so the two belong together. Past it the text
+ * clears out, and it is fully gone at the halfway mark where the wording swaps —
+ * which is the only place it can swap without one line replacing another in plain
+ * sight.
+ */
+const TEXT_HOLD = 0.32;
+
+/**
+ * The staged reveal every piece of the open section shares: it rises into place
+ * once the cube has parked, and leaves with no delay at all the moment the cube
+ * sets off home — last in, first out.
+ */
+const reveal = (shown: boolean, delay: number) => ({
+  opacity: shown ? 1 : 0,
+  transform: shown ? "translateY(0)" : "translateY(14px)",
+  transition: "opacity 600ms, transform 600ms cubic-bezier(0.22, 1, 0.36, 1)",
+  transitionDelay: shown ? `${SHUTTER_MS + delay}ms` : "0ms",
+});
 
 export function LiquidColumns() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -31,6 +114,98 @@ export function LiquidColumns() {
   // are still out at this point — they only come back once it has landed.
   const [closing, setClosing] = useState(false);
   const stageTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Which experience is settled on, and which one it came from — the reel needs the
+  // digit it is leaving to know where to start its rotation. The position itself is
+  // not state: it changes every frame, and re-rendering the page at that rate to
+  // move two pictures would be absurd.
+  const [entry, setEntry] = useState({ index: 0, from: 0 });
+  const mainRef = useRef<HTMLElement>(null);
+  /** Where the list actually is, and where the wheel has asked it to go. */
+  const at = useRef(0);
+  const want = useRef(0);
+  const rafId = useRef(0);
+
+  // Wheel-dragged, not wheel-triggered. The deltas move a continuous position, the
+  // position chases it with an ease, and everything is placed from it — so the
+  // pictures follow the hand instead of playing a canned animation at it.
+  //
+  // Nothing rounds it afterwards. Stopping between two experiences leaves it
+  // between two: the ease is only there to smooth the hand, not to pull the list
+  // anywhere it was not put.
+  useEffect(() => {
+    if (opened === null || COLUMNS[opened] !== "Experience") return;
+    const last = EXPERIENCE.length - 1;
+    let prev = 0;
+
+    const paint = () => {
+      const el = mainRef.current;
+      if (!el) return;
+      const p = at.current;
+      el.style.setProperty("--p", p.toFixed(4));
+      // The text holds while its picture is near home and only clears out over the
+      // last stretch before the swap.
+      const off = Math.abs(p - Math.round(p));
+      const fade = Math.min(1, Math.max(0, (0.5 - off) / (0.5 - TEXT_HOLD)));
+      el.style.setProperty("--fade", fade.toFixed(3));
+      const near = Math.round(p);
+      setEntry((was) =>
+        was.index === near ? was : { index: near, from: was.index },
+      );
+    };
+
+    const tick = (now: number) => {
+      const dt = Math.min((now - (prev || now)) / 1000, 1 / 20);
+      prev = now;
+      at.current += (want.current - at.current) * (1 - SCROLL_SMOOTH ** dt);
+      if (Math.abs(want.current - at.current) < 0.0004) {
+        at.current = want.current;
+        paint();
+        rafId.current = 0;
+        return;
+      }
+      paint();
+      rafId.current = requestAnimationFrame(tick);
+    };
+
+    const run = () => {
+      if (!rafId.current) {
+        prev = 0;
+        rafId.current = requestAnimationFrame(tick);
+      }
+    };
+
+    const onWheel = (e: WheelEvent) => {
+      // Clamped rather than wrapped: dragging a list has two ends, and being
+      // thrown back to the start mid-gesture is not a thing a list does.
+      want.current = Math.min(
+        last,
+        Math.max(0, want.current + e.deltaY / SCROLL_PER_ENTRY),
+      );
+      run();
+    };
+
+    const onKey = (e: KeyboardEvent) => {
+      const step =
+        e.key === "ArrowRight" || e.key === "ArrowDown"
+          ? 1
+          : e.key === "ArrowLeft" || e.key === "ArrowUp"
+            ? -1
+            : 0;
+      if (!step) return;
+      want.current = Math.min(last, Math.max(0, Math.round(want.current) + step));
+      run();
+    };
+
+    window.addEventListener("wheel", onWheel, { passive: true });
+    window.addEventListener("keydown", onKey);
+    paint();
+    return () => {
+      window.removeEventListener("wheel", onWheel);
+      window.removeEventListener("keydown", onKey);
+      if (rafId.current) cancelAnimationFrame(rafId.current);
+      rafId.current = 0;
+    };
+  }, [opened]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -107,7 +282,10 @@ export function LiquidColumns() {
   useEffect(() => {
     if (opened === null) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") close();
+      if (e.key === "Escape") {
+        close();
+        return;
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -173,6 +351,10 @@ export function LiquidColumns() {
     r.target.crystal = true;
     openedRef.current = hovered.current;
     setOpened(hovered.current);
+    // A section always opens on its first entry.
+    setEntry({ index: 0, from: 0 });
+    at.current = 0;
+    want.current = 0;
     r.wake();
     if (stageTimer.current) clearTimeout(stageTimer.current);
     stageTimer.current = setTimeout(() => {
@@ -183,9 +365,14 @@ export function LiquidColumns() {
   // The section is open and staying open: the cube is parked in the corner, so the
   // title and the way back out belong on screen. False the instant it sets off home.
   const settled = opened !== null && !closing;
+  const shown = EXPERIENCE[entry.index];
+  /** Both counter digits, and the ones being left, so only the one that moves rolls. */
+  const digits = pad(entry.index + 1).split("");
+  const leaving = pad(entry.from + 1).split("");
+  const countDir = Math.sign(entry.index - entry.from);
 
   return (
-    <main className="relative h-dvh w-full overflow-hidden bg-white">
+    <main ref={mainRef} className="relative h-dvh w-full overflow-hidden bg-white">
       <canvas
         ref={canvasRef}
         aria-hidden
@@ -227,10 +414,7 @@ export function LiquidColumns() {
                 className="transition-opacity duration-300"
                 style={{ opacity: opened === i ? 0 : 1 }}
               >
-                <span className="font-mono text-[10px] tracking-[0.2em] tabular-nums text-neutral-400 sm:text-xs">
-                  {String(i + 1).padStart(2, "0")}
-                </span>
-                <h2 className="mt-2 text-sm font-medium tracking-tight text-neutral-900 sm:text-xl md:text-2xl">
+                <h2 className="text-sm font-medium tracking-tight text-neutral-900 sm:text-xl md:text-2xl">
                   {label}
                 </h2>
               </div>
@@ -246,20 +430,136 @@ export function LiquidColumns() {
       <div
         aria-hidden={!settled}
         className="pointer-events-none absolute left-5 top-36 sm:left-10 sm:top-48"
-        style={{
-          opacity: settled ? 1 : 0,
-          transform: settled ? "translateY(0)" : "translateY(14px)",
-          transition: "opacity 600ms, transform 600ms cubic-bezier(0.22, 1, 0.36, 1)",
-          transitionDelay: settled ? `${SHUTTER_MS + 480}ms` : "0ms",
-        }}
       >
-        <span className="font-mono text-[10px] tracking-[0.2em] tabular-nums text-neutral-400 sm:text-xs">
-          {opened === null ? "" : String(opened + 1).padStart(2, "0")}
-        </span>
-        <h1 className="mt-3 text-4xl font-medium tracking-tight text-neutral-900 sm:text-6xl">
-          {opened === null ? "" : COLUMNS[opened]}
-        </h1>
+        <div
+          className="flex items-baseline gap-3 sm:gap-4"
+          style={reveal(settled, 480)}
+        >
+          <h1 className="text-4xl font-medium tracking-tight text-neutral-900 sm:text-6xl">
+            {opened === null ? "" : COLUMNS[opened]}
+          </h1>
+          {/* Sits on the title's own baseline, so it reads as an annotation to it
+              rather than as a second line. */}
+          {opened !== null && COLUMNS[opened] === "Experience" && (
+            <span className="font-mono text-[10px] tracking-[0.2em] tabular-nums text-neutral-400 sm:text-xs">
+              [{" "}
+              {digits.map((d, i) => {
+                const was = Number(leaving[i]);
+                const now = Number(d);
+                // Exactly one notch, in the direction the counter went: 1 turns to
+                // 2 with nothing seen in between. Modulo so 9 to 0 is one notch
+                // forward rather than nine backwards.
+                const step =
+                  countDir >= 0
+                    ? (now - was + 10) % 10
+                    : -((was - now + 10) % 10);
+                return (
+                  // One window per digit, keyed on the digit: a position that does
+                  // not change is not remounted and does not move at all.
+                  <span key={i} className="reel-window">
+                    <span
+                      key={d}
+                      className="reel-strip"
+                      style={
+                        {
+                          // Resting in the middle repeat of the strip, so a notch
+                          // either way stays on it.
+                          "--reel-from": 10 + was,
+                          "--reel-to": 10 + was + step,
+                        } as React.CSSProperties
+                      }
+                    >
+                      {Array.from({ length: 30 }, (_, n) => (
+                        <span key={n}>{n % 10}</span>
+                      ))}
+                    </span>
+                  </span>
+                );
+              })}{" "}
+              / {pad(EXPERIENCE.length)} ]
+            </span>
+          )}
+        </div>
+
+        {/* Only the section that has entries gets them. Everything shares the
+            title's left edge by sitting inside it, so nothing can drift out of
+            alignment on its own. Each entry arrives a beat after the title, and
+            its own three parts a beat after each other. */}
+        {opened !== null && COLUMNS[opened] === "Experience" && (
+          // Two nested mechanisms, on purpose. The outer element owns the section
+          // opening and closing; the inner one, re-keyed on the entry, owns the
+          // change from one experience to the next. They cannot share an element: a
+          // CSS animation with fill-mode `both` holds its last frame and would win
+          // over the inline opacity the exit needs.
+          <div className="mt-12 sm:mt-16" style={reveal(settled, 620)}>
+            {/* Faded straight off the scroll position, so it thins out as the list
+                is dragged and is already gone at the halfway point where the
+                wording swaps. */}
+            <article style={{ opacity: "var(--fade, 1)" }}>
+              <h2 className="text-lg font-medium tracking-tight text-neutral-900 sm:text-2xl">
+                {shown.role}
+              </h2>
+              <p className="mt-2 font-mono text-[10px] tracking-[0.2em] tabular-nums text-neutral-400 sm:text-xs">
+                {shown.dates}
+              </p>
+                {/* 48 characters, or whatever the window can spare — whichever is
+                    smaller. That measure reads as a column of text rather than a
+                    paragraph running the page width, and it is about where five
+                    lines land; but it is a fixed width, so on a narrower window it
+                    would keep growing into the image on the right. It has to give
+                    way instead, or a long line lands under the photo. */}
+              <p className="mt-8 max-w-[min(48ch,44vw)] text-sm leading-relaxed text-neutral-600 sm:mt-10 sm:text-base">
+                {shown.summary}
+              </p>
+            </article>
+          </div>
+        )}
       </div>
+
+      {/* The entry's image, opposite its text: the left half reads, the right half
+          looks. Vertically centred rather than pinned to the title, which keeps it
+          from tipping the page top-heavy next to a short entry.
+
+          Hidden below `sm`: at that width the image and a 48-character measure
+          cannot share a line, and the page cannot scroll to stack them — it is one
+          viewport tall with the overflow clipped.
+
+          Pulled in from the right edge so it sits nearer the text than the frame,
+          but only from `lg` up: at the narrow end of `sm` the measure and the image
+          already almost touch, and moving it left there would land it on the words. */}
+      {opened !== null && COLUMNS[opened] === "Experience" && (
+        <div className="pointer-events-none absolute right-10 top-1/2 hidden -translate-y-1/2 sm:block lg:right-40">
+          {/* Two things about this wrapper: the reveal owns `transform` for its rise,
+              so the centring translate has to live on the parent rather than fight it
+              here; and the frame is 1.85:1 while the source is 3:2, so `fill` plus
+              object-cover crops the top and bottom instead of squashing. */}
+          <div
+            className="relative aspect-[1.85/1] w-[34vw] max-w-[560px]"
+            style={reveal(settled, 560)}
+          >
+            {/* Every entry is laid out from the same position, a screen apart.
+                Nothing is keyed or replayed: drag the position and the whole strip
+                moves with it. The frame does not clip them — only the page does —
+                so a picture is visible for the whole of its crossing. */}
+            {EXPERIENCE.map((item, i) => (
+              <div
+                key={i}
+                className="frame-layer"
+                style={{ "--i": i } as React.CSSProperties}
+              >
+                <Image
+                  src={item.image}
+                  alt={i === entry.index ? item.imageAlt : ""}
+                  fill
+                  sizes="34vw"
+                  placeholder="blur"
+                  className="object-cover"
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* The docked cube is the way back out, plus Escape. Nothing is drawn here —
           the cube is its own affordance, this is only the hit area over it, live
