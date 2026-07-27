@@ -75,17 +75,13 @@ const SCROLL_SMOOTH = 0.0009;
  * the frame. The wording belongs to its entry for the whole crossing and only hands
  * over as the next picture lands at the height it will rest at.
  *
- * TEXT_BLANK is a hold either side of that point where the text is fully gone, so
- * the change is marked rather than instantaneous; TEXT_SPAN is the fade on each
- * side of the hold.
- *
- * The two together cannot exceed TEXT_SWAP: past that the text would still be on
- * its way back when the picture has already settled, and would never reach full
- * strength at rest.
+ * TEXT_SPAN is the fade on either side of that point. It cannot exceed TEXT_SWAP,
+ * and here it is exactly it: past that the text would still be on its way back once
+ * the picture had settled, and would never reach full strength at rest. So this is
+ * as slow as the fade goes without moving the moment it changes hands.
  */
 const TEXT_SWAP = 0.16;
-const TEXT_BLANK = 0.05;
-const TEXT_SPAN = 0.11;
+const TEXT_SPAN = 0.16;
 
 /**
  * When the open section lands, counted from the click. The title, the entry and the
@@ -139,11 +135,10 @@ export function LiquidColumns() {
   // are still out at this point — they only come back once it has landed.
   const [closing, setClosing] = useState(false);
   const stageTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Which experience is settled on, and which one it came from — the reel needs the
-  // digit it is leaving to know where to start its rotation. The position itself is
-  // not state: it changes every frame, and re-rendering the page at that rate to
-  // move two pictures would be absurd.
-  const [entry, setEntry] = useState({ index: 0, from: 0 });
+  // Which experience is settled on. The position itself is not state: it changes
+  // every frame, and re-rendering the page at that rate to move two pictures would
+  // be absurd.
+  const [entryIndex, setEntryIndex] = useState(0);
   const mainRef = useRef<HTMLElement>(null);
   /** Where the list actually is, and where the wheel has asked it to go. */
   const at = useRef(0);
@@ -175,24 +170,26 @@ export function LiquidColumns() {
       const forward = dir.current >= 0;
       const frac = p - Math.floor(p);
       const arriving = forward ? 1 - frac : frac;
-      const off = Math.abs(arriving - TEXT_SWAP);
       el.style.setProperty(
         "--fade",
-        Math.min(1, Math.max(0, (off - TEXT_BLANK) / TEXT_SPAN)).toFixed(3),
+        Math.min(1, Math.abs(arriving - TEXT_SWAP) / TEXT_SPAN).toFixed(3),
       );
-      // The counter turns with the wording rather than at the midpoint: they name
-      // the same thing, and they would disagree for a whole stretch otherwise.
-      const reached = arriving < TEXT_SWAP;
-      const idx = Math.min(
+
+      // Which two entries this stretch is between. Clamped, so at either end of the
+      // list the pair collapses and nothing changes hands.
+      const leavingIdx = Math.min(
         last,
-        Math.max(
-          0,
-          reached === forward ? Math.ceil(p) : Math.floor(p),
-        ),
+        Math.max(0, forward ? Math.floor(p) : Math.ceil(p)),
       );
-      setEntry((was) =>
-        was.index === idx ? was : { index: idx, from: was.index },
+      const towardIdx = Math.min(
+        last,
+        Math.max(0, leavingIdx + (forward ? 1 : -1)),
       );
+
+      // The wording swaps at the middle of its own blank stretch, which is the only
+      // place it can change without one line replacing another in plain sight.
+      const idx = arriving < TEXT_SWAP ? towardIdx : leavingIdx;
+      setEntryIndex((was) => (was === idx ? was : idx));
     };
 
     const tick = (now: number) => {
@@ -395,10 +392,8 @@ export function LiquidColumns() {
     r.target.crystal = true;
     openedRef.current = hovered.current;
     setOpened(hovered.current);
-    // A section always opens on its first entry. `from` of -1 is the arrival: it
-    // makes the counter roll its one notch onto 01 rather than sitting there
-    // already showing it, and it is what tells the reel to wait for the reveal.
-    setEntry({ index: 0, from: -1 });
+    // A section always opens on its first entry.
+    setEntryIndex(0);
     at.current = 0;
     want.current = 0;
     dir.current = 1;
@@ -412,11 +407,7 @@ export function LiquidColumns() {
   // The section is open and staying open: the cube is parked in the corner, so the
   // title and the way back out belong on screen. False the instant it sets off home.
   const settled = opened !== null && !closing;
-  const shown = EXPERIENCE[entry.index];
-  /** Both counter digits, and the ones being left, so only the one that moves rolls. */
-  const digits = pad(entry.index + 1).split("");
-  const leaving = pad(entry.from + 1).split("");
-  const countDir = Math.sign(entry.index - entry.from);
+  const shown = EXPERIENCE[entryIndex];
 
   return (
     <main ref={mainRef} className="relative h-dvh w-full overflow-hidden bg-white">
@@ -490,44 +481,13 @@ export function LiquidColumns() {
           {opened !== null && COLUMNS[opened] === "Experience" && (
             <span className="font-mono text-[10px] tracking-[0.2em] tabular-nums text-neutral-400 sm:text-xs">
               [{" "}
-              {digits.map((d, i) => {
-                const was = Number(leaving[i]);
-                const now = Number(d);
-                // Exactly one notch, in the direction the counter went: 1 turns to
-                // 2 with nothing seen in between. Modulo so 9 to 0 is one notch
-                // forward rather than nine backwards.
-                const step =
-                  countDir >= 0
-                    ? (now - was + 10) % 10
-                    : -((was - now + 10) % 10);
-                return (
-                  // One window per digit, keyed on the digit: a position that does
-                  // not change is not remounted and does not move at all.
-                  <span key={i} className="reel-window">
-                    <span
-                      key={d}
-                      className="reel-strip"
-                      style={
-                        {
-                          // Resting in the middle repeat of the strip, so a notch
-                          // either way stays on it.
-                          "--reel-from": 10 + was,
-                          "--reel-to": 10 + was + step,
-                          // On the way in it waits for the title it sits on, or it
-                          // would turn over while still invisible. Afterwards it is
-                          // answering a gesture, so it is immediate.
-                          animationDelay:
-                            entry.from < 0 ? `${ARRIVE_MS}ms` : "0ms",
-                        } as React.CSSProperties
-                      }
-                    >
-                      {Array.from({ length: 30 }, (_, n) => (
-                        <span key={n}>{n % 10}</span>
-                      ))}
-                    </span>
-                  </span>
-                );
-              })}{" "}
+              {/* The number that changes takes the description's fade, off the same
+                  variable and on the same window — one movement for the whole text
+                  column rather than a mechanism of its own. The brackets and the
+                  total do not move, so they do not fade. */}
+              <span style={{ opacity: "var(--fade, 1)" }}>
+                {pad(entryIndex + 1)}
+              </span>{" "}
               / {pad(EXPERIENCE.length)} ]
             </span>
           )}
@@ -609,7 +569,7 @@ export function LiquidColumns() {
               >
                 <Image
                   src={item.image}
-                  alt={i === entry.index ? item.imageAlt : ""}
+                  alt={i === entryIndex ? item.imageAlt : ""}
                   fill
                   sizes="34vw"
                   placeholder="blur"
