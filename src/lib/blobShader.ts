@@ -39,6 +39,10 @@ uniform float uCube;     // 0 = liquid pillar, 1 = crystallised cube
 uniform float uFlow;     // continuous animation phase (never time * speed)
 uniform float uSlosh;    // 0..1 energy from pointer velocity
 uniform vec2  uAim;      // pointer offset from the centre, world units
+uniform float uHover;    // 0..1 pointer resting on the docked cube
+
+// No backticks anywhere below: the whole shader is one JS template literal, and a
+// stray pair in a comment closes it.
 
 out vec4 fragColor;
 
@@ -137,7 +141,16 @@ float shape(vec3 p){
   // back means two sines per SDF evaluation, so it is gone rather than scaled by 0.
   vec3 q = p;
 
-  q = rotX(-0.52 * turn) * rotY((0.66 + t * 0.13) * turn) * q;
+  // Answering the pointer: a tumble in the cube's own frame, applied before the iso
+  // tilt so it reads as the cube turning in place rather than the camera moving.
+  // Weighted by the crystal weight, so the liquid pillar is untouched — only the
+  // crystal reacts, and only the crystal is ever hovered.
+  float tumble = uHover * turn;
+  q = rotX(-0.52 * turn)
+    * rotY((0.66 + t * 0.13) * turn)
+    * rotX(0.42 * tumble)
+    * rotY(1.15 * tumble)
+    * q;
 
   vec3 half_ = mix(uHalf, vec3(uCubeHalf), form);
   float rad = mix(min(uHalf.x, uHalf.z) * 0.9, 0.035, hard);

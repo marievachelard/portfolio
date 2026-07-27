@@ -24,6 +24,11 @@ export type BlobTarget = {
    * the cube would be cut across instead of flying.
    */
   returning: boolean;
+  /**
+   * The pointer is resting on the docked cube. It answers with a tumble, and unwinds
+   * to where it was when the pointer leaves.
+   */
+  cubeHover: boolean;
   /** hovered column rect, CSS px */
   colCenterX: number;
   colCenterY: number;
@@ -185,6 +190,7 @@ export function createBlobRenderer(canvas: HTMLCanvasElement): BlobRenderer | nu
     flow: gl.getUniformLocation(program, "uFlow"),
     slosh: gl.getUniformLocation(program, "uSlosh"),
     aim: gl.getUniformLocation(program, "uAim"),
+    hover: gl.getUniformLocation(program, "uHover"),
   };
 
   gl.enable(gl.BLEND);
@@ -195,6 +201,7 @@ export function createBlobRenderer(canvas: HTMLCanvasElement): BlobRenderer | nu
     crystal: false,
     docked: false,
     returning: false,
+    cubeHover: false,
     colCenterX: 0,
     colCenterY: 0,
     colWidth: 0,
@@ -207,7 +214,17 @@ export function createBlobRenderer(canvas: HTMLCanvasElement): BlobRenderer | nu
   // single frame — it never travels. `fill` is the level itself, 0..1: the column
   // fills as the pointer enters the grid and empties as it leaves, and a change of
   // column leaves it alone, since the liquid does not drain on the way across.
-  const eased = { x: 0, y: 0, width: 0, height: 0, fill: 0, cube: 0, unit: 0 };
+  const eased = {
+    x: 0,
+    y: 0,
+    width: 0,
+    height: 0,
+    fill: 0,
+    cube: 0,
+    unit: 0,
+    /** How far into its tumble the cube is, 0 at rest and 1 held under the pointer. */
+    hover: 0,
+  };
   // Clip window, CSS px. Both edges are only ever set to a column boundary — never
   // interpolated — so the cut never lands mid-column, and the body is always
   // contained by exactly the column it lives in.
@@ -368,6 +385,9 @@ export function createBlobRenderer(canvas: HTMLCanvasElement): BlobRenderer | nu
     }
     eased.unit = ease(eased.unit, wantUnit, 0.0009, dt);
     eased.cube = ease(eased.cube, target.crystal ? 1 : 0, 0.0022, dt);
+    // Into the tumble and back out of it at the same rate: the same gesture either
+    // way, which is what makes leaving read as unwinding rather than as a release.
+    eased.hover = ease(eased.hover, target.cubeHover ? 1 : 0, 0.002, dt);
 
     // The level rises while a column is hovered and falls once none is. Nothing here
     // knows which column it is — leaving the grid from one and coming back to
@@ -433,6 +453,7 @@ export function createBlobRenderer(canvas: HTMLCanvasElement): BlobRenderer | nu
     gl.uniform1f(u.cubeHalf, CUBE_HALF);
     gl.uniform1f(u.flow, flow);
     gl.uniform1f(u.slosh, slosh);
+    gl.uniform1f(u.hover, eased.hover);
     // Surface shape is frame-wide: the wave is a fraction of a world unit and the
     // tilt is a slope, so both stay correct whatever body they are applied to.
     gl.uniform1f(u.wave, wave);

@@ -303,6 +303,13 @@ export function LiquidColumns() {
     };
   }, []);
 
+  const hoverCube = (on: boolean) => {
+    const r = renderer.current;
+    if (!r) return;
+    r.target.cubeHover = on;
+    r.wake();
+  };
+
   // open() run backwards, stage for stage. The cube leaves the corner and flies home
   // first, alone; only once it is back in its column do the shutters return and the
   // cube melt into it. Doing it all at once — which is what this used to do — throws
@@ -327,6 +334,9 @@ export function LiquidColumns() {
       // it on the next mouse move would be a flicker for nothing.
       rr.target.returning = false;
       rr.target.crystal = false;
+      // The pointer may well be sitting where the cube used to be; it is not on it
+      // any more, and pointerleave does not fire for a thing that stopped existing.
+      rr.target.cubeHover = false;
       openedRef.current = null;
       // A click without an intervening move must not reopen the column it just left.
       hovered.current = -1;
@@ -638,10 +648,14 @@ export function LiquidColumns() {
 
       {/* The docked cube is the way back out, plus Escape. Nothing is drawn here —
           the cube is its own affordance, this is only the hit area over it, live
-          once it has landed so its flight cannot be cut short half way. */}
+          once it has landed so its flight cannot be cut short half way.
+          It is also what tells the cube it is being looked at: the tumble is the only
+          sign this area is live, since there is nothing here to highlight. */}
       <button
         type="button"
         onClick={close}
+        onPointerEnter={() => hoverCube(true)}
+        onPointerLeave={() => hoverCube(false)}
         aria-label="Close"
         className="absolute left-0 top-0 h-40 w-40 cursor-pointer"
         style={{ pointerEvents: settled ? "auto" : "none" }}
