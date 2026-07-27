@@ -35,14 +35,16 @@ body {
    to the third — and every picture is placed from it, so the whole strip follows
    the hand and settles on the nearest entry when the hand stops.
 
-   Each one is a screen apart: half the viewport carries a centred picture to the
-   top edge, its own height takes the rest of it past. So at any whole number one
-   picture is centred and the others are out of the window, and in between they
-   cross it. */
+   The spacing is what sets how much white passes between two pictures. Half the
+   viewport carries a centred picture to the top edge, and the rest is a fraction of
+   its own height: `50vh + 50%` is the floor, the exact point where a neighbour sits
+   flush against the edge of the window at rest. Anything less and the next picture
+   is already peeking into the frame when the list is settled. 75% leaves a quarter
+   of a frame of margin on that. */
 .frame-layer {
   position: absolute;
   inset: 0;
-  transform: translateY(calc((var(--i) - var(--p, 0)) * (50vh + 100%)));
+  transform: translateY(calc((var(--i) - var(--p, 0)) * (50vh + 75%)));
 }
 
 /* The counter. One strip of digits per position, stacked one per line and
