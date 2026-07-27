@@ -20,14 +20,18 @@ const SHUTTER_MS = 650;
 /**
  * Experience entries, newest first. Adding one is one more item here.
  *
- * The text below is placeholder, not a real position — it is written the length the
- * measure is set for so the layout reads true. `summary` is meant to stay inside
- * five lines: the column is capped at 48 characters, which is roughly that. It is
- * not truncated, so writing more just makes it taller.
+ * Only `title` is real. The dates and summaries are still placeholder — and now that
+ * they sit under actual company names they read like a CV, so: the years below were
+ * invented to space the list out, and the summaries are written to the length the
+ * measure is set for so the layout reads true. Neither describes anything.
+ *
+ * `summary` is meant to stay inside five lines: the column is capped at 48
+ * characters, which is roughly that. It is not truncated, so writing more just makes
+ * it taller.
  */
 const EXPERIENCE = [
   {
-    role: "Intitulé du poste — Entreprise",
+    title: "Pictarine",
     /** Digits only, en dash, tabular so a column of them lines up. */
     dates: "2021 — 2024",
     summary:
@@ -37,7 +41,7 @@ const EXPERIENCE = [
     imageAlt: "Ciel d'été, gros cumulus, grain de pellicule",
   },
   {
-    role: "Deuxième poste — Autre entreprise",
+    title: "Capgemini",
     dates: "2019 — 2021",
     summary:
       "Une description plus courte que la précédente, pour voir comment la transition se comporte quand le bloc de texte change de hauteur d'une expérience à l'autre.",
@@ -45,7 +49,7 @@ const EXPERIENCE = [
     imageAlt: "Massif de fleurs saisi en filé, rouges et blancs sur vert",
   },
   {
-    role: "Troisième poste — Encore une autre",
+    title: "Deezer",
     dates: "2017 — 2019",
     summary:
       "Celle-ci est volontairement plus longue, pour occuper les cinq lignes de la mesure et vérifier que rien ne saute au moment du changement : le texte doit se relayer ligne par ligne, sans que la page se réorganise autour de lui.",
@@ -53,7 +57,7 @@ const EXPERIENCE = [
     imageAlt: "Ciel d'été, gros cumulus, grain de pellicule",
   },
   {
-    role: "Premier poste — Là où ça a commencé",
+    title: "Airbus",
     dates: "2015 — 2017",
     summary:
       "La dernière du lot, courte elle aussi, pour boucler le compteur et revenir à la première.",
@@ -588,7 +592,7 @@ export function LiquidColumns() {
               }}
             >
               <h2 className="text-lg font-medium tracking-tight text-neutral-900 sm:text-2xl">
-                {shown.role}
+                {shown.title}
               </h2>
               <p className="mt-2 font-mono text-[10px] tracking-[0.2em] tabular-nums text-neutral-400 sm:text-xs">
                 {shown.dates}
