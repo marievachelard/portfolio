@@ -18,49 +18,50 @@ const COLUMNS = ["About", "Experience", "Projects", "Contact"];
 const SHUTTER_MS = 650;
 
 /**
- * Experience entries, newest first. Adding one is one more item here.
+ * Experience entries, newest first. Adding one is one more item here. All of it is
+ * real now — titles, dates and summaries.
  *
- * Only `title` is real. The dates and summaries are still placeholder — and now that
- * they sit under actual company names they read like a CV, so: the years below were
- * invented to space the list out, and the summaries are written to the length the
- * measure is set for so the layout reads true. Neither describes anything.
+ * The summaries run four to five hundred characters. That is past the five lines the
+ * measure was first described for, but not past what it holds: 48ch is the width of
+ * 48 zeroes, and this face averages narrower than that, so a line takes closer to
+ * seventy characters. These land in seven or eight lines and fit as they are.
  *
- * `summary` is meant to stay inside five lines: the column is capped at 48
- * characters, which is roughly that. It is not truncated, so writing more just makes
- * it taller.
+ * The ceiling is the window, not the measure. The page does not scroll and what does
+ * not fit is clipped rather than reachable, so a summary much longer than these needs
+ * the layout rethought rather than the measure nudged.
  */
 const EXPERIENCE = [
   {
     title: "Pictarine",
-    /** Digits only, en dash, tabular so a column of them lines up. */
-    dates: "2021 — 2024",
+    /** Digits and an en dash, tabular so a column of them lines up. */
+    dates: "2022 – Present",
     summary:
-      "Deux ou trois phrases sur ce qui a été construit, pour qui, et ce que cela a changé. Assez court pour tenir en cinq lignes à cette largeur, assez concret pour qu'on sache de quoi il s'agit sans avoir à demander.",
+      "I joined as the first data person and I'm still here, building the data function from the ground up. The strategy, the BI platform, the engineering standards, the team of six: all of it started as a blank page. My job today is less about writing queries than about creating the conditions for six people to write better ones. I lead the Data pole as an Engineering Manager, which means owning both the technical direction and the humans behind it.",
     image: clouds,
     /** Describes the frame, since nothing in the text does it. */
     imageAlt: "Ciel d'été, gros cumulus, grain de pellicule",
   },
   {
     title: "Capgemini",
-    dates: "2019 — 2021",
+    dates: "2018 – 2022",
     summary:
-      "Une description plus courte que la précédente, pour voir comment la transition se comporte quand le bloc de texte change de hauteur d'une expérience à l'autre.",
+      "Four years, five countries, and a lot of very different projects. I worked on-site in Hamburg, Madrid, Cadiz, Singapore and Paris, on everything from aircraft quality control at Airbus to unsupervised learning on cybersecurity threats. Some missions I led solo, others with a team, always with a client in the room and a business question behind the model. It taught me to land somewhere new, understand the domain fast, and ship something people actually use.",
     image: blooms,
     imageAlt: "Massif de fleurs saisi en filé, rouges et blancs sur vert",
   },
   {
     title: "Deezer",
-    dates: "2017 — 2019",
+    dates: "2017 – 2018",
     summary:
-      "Celle-ci est volontairement plus longue, pour occuper les cinq lignes de la mesure et vérifier que rien ne saute au moment du changement : le texte doit se relayer ligne par ligne, sans que la page se réorganise autour de lui.",
+      "This is where I learned that a number is worthless until someone can act on it. I supported Deezer's international growth, working directly with Country Directors on marketing strategy and partnerships. My job was less about building models than about making sure the right people trusted the right numbers at the right moment. I got very good at translating between analytics and marketing.",
     image: clouds,
     imageAlt: "Ciel d'été, gros cumulus, grain de pellicule",
   },
   {
     title: "Airbus",
-    dates: "2015 — 2017",
+    dates: "2016 – 2017",
     summary:
-      "La dernière du lot, courte elle aussi, pour boucler le compteur et revenir à la première.",
+      "My first job, and I got to ask a genuinely hard question: how confident should you actually be in a 20-year market share forecast? I rebuilt Airbus' Global Delivery Forecast tool by adding Monte Carlo simulations on top of a deterministic model, to quantify where the uncertainty really came from. Non-linear regression, random forests, time series, and an R Shiny app so the whole strategy team could use it without reading a line of code. This is where I fell in love with statistics that have consequences.",
     image: blooms,
     imageAlt: "Massif de fleurs saisi en filé, rouges et blancs sur vert",
   },
