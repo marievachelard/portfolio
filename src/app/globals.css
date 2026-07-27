@@ -35,16 +35,23 @@ body {
    to the third — and every picture is placed from it, so the whole strip follows
    the hand and settles on the nearest entry when the hand stops.
 
-   The spacing is what sets how much white passes between two pictures. Half the
-   viewport carries a centred picture to the top edge, and the rest is a fraction of
-   its own height: `50vh + 50%` is the floor, the exact point where a neighbour sits
-   flush against the edge of the window at rest. Anything less and the next picture
-   is already peeking into the frame when the list is settled. 75% leaves a quarter
-   of a frame of margin on that. */
+   The spacing is what sets how much white passes between two pictures, and it is set
+   by the furthest a neighbour has to go to be out of the window. The strip no longer
+   rests in the middle of the page but on the middle of the block of words, lower down,
+   so the two edges are no longer symmetric: the one above has to clear --rest, the one
+   below has to clear what is left underneath. Whichever is further governs, and 60% of
+   a frame carries the rest of it past the edge with a little to spare.
+
+   Below that a neighbour is already showing when the list is settled on an entry. */
 .frame-layer {
   position: absolute;
   inset: 0;
-  transform: translateY(calc((var(--i) - var(--p, 0)) * (50vh + 75%)));
+  transform: translateY(
+    calc(
+      (var(--i) - var(--p, 0)) *
+        (max(var(--rest, 50vh), 100vh - var(--rest, 50vh)) + 60%)
+    )
+  );
 }
 
 /* Opening a section, in two beats.

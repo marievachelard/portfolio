@@ -115,6 +115,25 @@ const UNTYPE_STEP = 40;
 /** Beat between the last letter leaving and the cube moving. */
 const CUBE_GAP = 120;
 
+/**
+ * Where the photograph rests, CSS px down the page: on the middle of the block of
+ * words, rather than on the middle of the window as it was.
+ *
+ * Derived rather than measured, and the parts check out against the DOM: the title
+ * sits at top-48, its 6xl line is 60 tall, and mt-16 separates it from the block —
+ * which puts the block at 316 and its middle at 455.
+ *
+ * BLOCK_H is reserved on the block for a reason. Entries run six or seven lines, and
+ * without a floor the middle of a six-line one sits 13px higher: the photograph's
+ * resting place would move under it, and the whole strip would jump the moment the
+ * wording changed.
+ */
+const TITLE_TOP = 192;
+const TITLE_LINE = 60;
+const BLOCK_GAP = 64;
+const BLOCK_H = 278;
+const IMAGE_REST_Y = TITLE_TOP + TITLE_LINE + BLOCK_GAP + BLOCK_H / 2;
+
 export function LiquidColumns() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
@@ -611,7 +630,7 @@ export function LiquidColumns() {
           // Three levels, one job each: leaving, arriving, and the scroll fade.
           // They cannot share an element — an animation holding its last frame
           // would win over the opacity the other two need.
-          <div className="mt-12 sm:mt-16">
+          <div className="mt-12 sm:mt-16" style={{ minHeight: BLOCK_H }}>
             <div
               className={closing ? "depart" : "arrive"}
               style={{ animationDelay: closing ? "0ms" : `${restAt}ms` }}
@@ -659,7 +678,13 @@ export function LiquidColumns() {
           but only from `lg` up: at the narrow end of `sm` the measure and the image
           already almost touch, and moving it left there would land it on the words. */}
       {opened !== null && COLUMNS[opened] === "Experience" && (
-        <div className="pointer-events-none absolute right-10 top-1/2 hidden -translate-y-1/2 sm:block lg:right-40">
+        <div
+          className="pointer-events-none absolute right-10 hidden -translate-y-1/2 sm:block lg:right-40"
+          // Its resting height, and the same figure handed to the CSS: the spacing
+          // between two photographs is worked out from it, since a strip that rests
+          // off-centre has further to travel to clear the top of the window.
+          style={{ top: IMAGE_REST_Y, "--rest": `${IMAGE_REST_Y}px` } as React.CSSProperties}
+        >
           {/* Two things about this wrapper: the reveal owns `transform` for its rise,
               so the centring translate has to live on the parent rather than fight it
               here; and the frame is 1.85:1 while the source is 3:2, so `fill` plus
