@@ -429,10 +429,11 @@ export function LiquidColumns() {
     r.target.crystal = true;
     openedRef.current = hovered.current;
     setOpened(hovered.current);
-    // A section always opens on its first entry. `from` of -1 is the arrival: it
-    // makes the counter roll its one notch onto 01 rather than sitting there already
-    // showing it, and it is what tells the strip to wait for the reveal.
-    setEntry({ index: 0, from: -1 });
+    // A section always opens on its first entry, and on it already: `from` matching
+    // `index` leaves the counter nothing to roll. It simply appears with the title it
+    // sits on, like the rest of the block — the turn-over is for a change of entry,
+    // and arriving is not one.
+    setEntry({ index: 0, from: 0 });
     setTextIndex(0);
     at.current = 0;
     want.current = 0;
@@ -453,8 +454,6 @@ export function LiquidColumns() {
   const digits = pad(entry.index + 1).split("");
   const leaving = pad(entry.from + 1).split("");
   const countDir = Math.sign(entry.index - entry.from);
-  /** Arriving from the grid: the counter rolls on a clock, not on a gesture. */
-  const openRoll = entry.from < 0;
 
   return (
     <main ref={mainRef} className="relative h-dvh w-full overflow-hidden bg-white">
@@ -548,9 +547,6 @@ export function LiquidColumns() {
                         {
                           "--reel-from": 10 + was,
                           "--reel-to": 10 + was + step,
-                          // Arriving from the grid it waits for the title it sits on;
-                          // otherwise it fires on the crossing, with the wording.
-                          animationDelay: openRoll ? `${ARRIVE_MS}ms` : "0ms",
                         } as React.CSSProperties
                       }
                     >
