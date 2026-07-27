@@ -87,6 +87,41 @@ body {
   animation: arrive 700ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+/* Closing runs the same three beats backwards: the block drops away, the title
+   unwinds a letter at a time from its end, and only then does the cube set off home.
+
+   Both exits start from exactly the resting state, so swapping the class on an element
+   that was holding the last frame of its arrival does not jump. The curve is the
+   mirror of the arrival's — an ease-in where that was an ease-out — which is what
+   makes it read as the same movement reversed rather than as a different one. */
+@keyframes type-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.type-out {
+  animation: type-out 80ms linear both;
+}
+
+@keyframes depart {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(64px);
+  }
+}
+
+.depart {
+  animation: depart 480ms cubic-bezier(0.64, 0, 0.78, 0) both;
+}
+
 /* The counter. One strip of digits per position, stacked one per line behind a
    window one line tall.
 
@@ -126,7 +161,9 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   .type-in,
+  .type-out,
   .arrive,
+  .depart,
   .reel-roll {
     animation-duration: 1ms;
   }

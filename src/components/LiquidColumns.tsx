@@ -105,11 +105,15 @@ const TYPE_START = SHUTTER_MS + 380;
 const TYPE_STEP = 45;
 const REST_GAP = 120;
 
-/** Leaving, for the parts that are mounted only while a section is open. */
-const exitFade = (closing: boolean) => ({
-  opacity: closing ? 0 : 1,
-  transition: "opacity 300ms linear",
-});
+/**
+ * Closing, the same three beats backwards, counted from the click on the cube. The
+ * block drops away first; the title starts unwinding from its last letter as that
+ * clears, and the cube only sets off home once the words are gone.
+ */
+const UNTYPE_START = 380;
+const UNTYPE_STEP = 40;
+/** Beat between the last letter leaving and the cube moving. */
+const CUBE_GAP = 120;
 
 export function LiquidColumns() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -316,38 +320,49 @@ export function LiquidColumns() {
     r.wake();
   };
 
-  // open() run backwards, stage for stage. The cube leaves the corner and flies home
-  // first, alone; only once it is back in its column do the shutters return and the
-  // cube melt into it. Doing it all at once — which is what this used to do — throws
-  // the whole sequence away and just snaps the page back.
+  // open() run backwards, beat for beat. Flipping `closing` starts the words leaving —
+  // the block drops, then the title unwinds from its last letter, both on delays in
+  // CSS. The cube waits for that to finish before it sets off home, and only once it
+  // is back in its column do the shutters return and it melt into it.
+  //
+  // Doing it all at once — which is what this used to do — throws the sequence away
+  // and just snaps the page back.
   const close = () => {
     const r = renderer.current;
     if (!r || opened === null || closing) return;
     if (stageTimer.current) clearTimeout(stageTimer.current);
     setClosing(true);
-    r.target.docked = false;
-    r.target.returning = true;
-    r.wake();
+
+    const letters = COLUMNS[opened].length;
+    const wordsGone = UNTYPE_START + (letters - 1) * UNTYPE_STEP + CUBE_GAP;
 
     stageTimer.current = setTimeout(() => {
-      const rr = renderer.current;
-      setOpened(null);
-      setClosing(false);
-      if (!rr) return;
-      // Home: hand the body back to the grid and let the cube become liquid again,
-      // filling the column it came from. `active` is deliberately left on — the
-      // column is under the pointer's own section, so draining it here and refilling
-      // it on the next mouse move would be a flicker for nothing.
-      rr.target.returning = false;
-      rr.target.crystal = false;
-      // The pointer may well be sitting where the cube used to be; it is not on it
-      // any more, and pointerleave does not fire for a thing that stopped existing.
-      rr.target.cubeHover = false;
-      setCubeHovered(false);
-      openedRef.current = null;
-      // A click without an intervening move must not reopen the column it just left.
-      hovered.current = -1;
-    }, SHUTTER_MS);
+      const rr0 = renderer.current;
+      if (rr0) {
+        rr0.target.docked = false;
+        rr0.target.returning = true;
+        rr0.wake();
+      }
+      stageTimer.current = setTimeout(() => {
+        const rr = renderer.current;
+        setOpened(null);
+        setClosing(false);
+        if (!rr) return;
+        // Home: hand the body back to the grid and let the cube become liquid again,
+        // filling the column it came from. `active` is deliberately left on — the
+        // column is under the pointer's own section, so draining it here and
+        // refilling it on the next mouse move would be a flicker for nothing.
+        rr.target.returning = false;
+        rr.target.crystal = false;
+        // The pointer may well be sitting where the cube used to be; it is not on it
+        // any more, and pointerleave does not fire for a thing that stopped existing.
+        rr.target.cubeHover = false;
+        setCubeHovered(false);
+        openedRef.current = null;
+        // A click without an intervening move must not reopen the column it just left.
+        hovered.current = -1;
+      }, SHUTTER_MS);
+    }, wordsGone);
   };
 
   useEffect(() => {
@@ -513,18 +528,21 @@ export function LiquidColumns() {
         aria-hidden={!settled}
         className="pointer-events-none absolute left-5 top-36 sm:left-10 sm:top-48"
       >
-        {/* The wrapper only handles leaving. The letters handle arriving, one delay
-            each — an animation on mount, which a transition could not do here. */}
-        <div
-          className="flex items-baseline gap-3 sm:gap-4"
-          style={exitFade(closing)}
-        >
+        {/* Each letter owns both its arriving and its leaving, on its own delay —
+            forwards from the first on the way in, backwards from the last on the way
+            out. Animations rather than transitions, because these mount and unmount
+            with the section and a transition has nothing to start from. */}
+        <div className="flex items-baseline gap-3 sm:gap-4">
           <h1 className="text-4xl font-medium tracking-tight text-neutral-900 sm:text-6xl">
             {label.split("").map((letter, i) => (
               <span
                 key={i}
-                className="type-in"
-                style={{ animationDelay: `${TYPE_START + i * TYPE_STEP}ms` }}
+                className={closing ? "type-out" : "type-in"}
+                style={{
+                  animationDelay: closing
+                    ? `${UNTYPE_START + (label.length - 1 - i) * UNTYPE_STEP}ms`
+                    : `${TYPE_START + i * TYPE_STEP}ms`,
+                }}
               >
                 {letter}
               </span>
@@ -534,10 +552,13 @@ export function LiquidColumns() {
               rather than as a second line. */}
           {opened !== null && COLUMNS[opened] === "Experience" && (
             <span
-              className="type-in font-mono text-[10px] tracking-[0.2em] tabular-nums text-neutral-400 sm:text-xs"
-              // Lands as the last letter does: it annotates the line, so it belongs
-              // to the line rather than to the block that rises after it.
-              style={{ animationDelay: `${typedAt}ms` }}
+              className={`${
+                closing ? "type-out" : "type-in"
+              } font-mono text-[10px] tracking-[0.2em] tabular-nums text-neutral-400 sm:text-xs`}
+              // Lands as the last letter does, and leaves before the first of them:
+              // it annotates the line, so it comes and goes with the line rather than
+              // with the block.
+              style={{ animationDelay: closing ? "0ms" : `${typedAt}ms` }}
             >
               [{" "}
               {/* Turning over rather than fading: the number has its own way of
@@ -588,8 +609,11 @@ export function LiquidColumns() {
           // Three levels, one job each: leaving, arriving, and the scroll fade.
           // They cannot share an element — an animation holding its last frame
           // would win over the opacity the other two need.
-          <div className="mt-12 sm:mt-16" style={exitFade(closing)}>
-            <div className="arrive" style={{ animationDelay: `${restAt}ms` }}>
+          <div className="mt-12 sm:mt-16">
+            <div
+              className={closing ? "depart" : "arrive"}
+              style={{ animationDelay: closing ? "0ms" : `${restAt}ms` }}
+            >
             {/* Out quickly, back more slowly, and the wording only swaps once it has
                 gone — so the old line and the new one are never both legible. */}
             <article
@@ -633,17 +657,16 @@ export function LiquidColumns() {
           but only from `lg` up: at the narrow end of `sm` the measure and the image
           already almost touch, and moving it left there would land it on the words. */}
       {opened !== null && COLUMNS[opened] === "Experience" && (
-        <div
-          className="pointer-events-none absolute right-10 top-1/2 hidden -translate-y-1/2 sm:block lg:right-40"
-          style={exitFade(closing)}
-        >
+        <div className="pointer-events-none absolute right-10 top-1/2 hidden -translate-y-1/2 sm:block lg:right-40">
           {/* Two things about this wrapper: the reveal owns `transform` for its rise,
               so the centring translate has to live on the parent rather than fight it
               here; and the frame is 1.85:1 while the source is 3:2, so `fill` plus
               object-cover crops the top and bottom instead of squashing. */}
           <div
-            className="arrive relative aspect-[1.85/1] w-[34vw] max-w-[560px]"
-            style={{ animationDelay: `${restAt}ms` }}
+            className={`${
+              closing ? "depart" : "arrive"
+            } relative aspect-[1.85/1] w-[34vw] max-w-[560px]`}
+            style={{ animationDelay: closing ? "0ms" : `${restAt}ms` }}
           >
             {/* Every entry is laid out from the same position, a screen apart.
                 Nothing is keyed or replayed: drag the position and the whole strip
