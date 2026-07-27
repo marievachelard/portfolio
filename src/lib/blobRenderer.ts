@@ -90,37 +90,6 @@ const SLOSH_REF = 900;
 const HANDOFF = 0.1;
 
 /**
- * Seconds to fill an empty column, integrated as a level rather than played as a
- * timed curve, so reversing mid-way picks up where it stands.
- */
-const FILL = 0.45;
-
-/**
- * Emptying is not filling in reverse. A tank drains under its own head, so it goes
- * fastest when it is full and lingers at the bottom — Torricelli, rate proportional
- * to the square root of the level. The floor keeps the last sliver from taking
- * forever.
- */
-const DRAIN_HEAD = 1.3;
-const DRAIN_FLOOR = 0.35;
-
-/**
- * The surface is never flat. It ripples gently at rest and much harder while the
- * level is moving, as a fraction of a world unit (half a column).
- */
-const WAVE_IDLE = 0.012;
-const WAVE_MOVE = 0.035;
-
-/**
- * The surface also rocks: a moving level drives it, a spring brings it back. ~1.4Hz
- * with a light damping ratio, so it overshoots a couple of times after the level
- * stops and settles — that overshoot is most of what reads as "liquid".
- */
-const ROCK_DRIVE = 1.6;
-const ROCK_OMEGA = 9;
-const ROCK_DAMP = 0.22;
-
-/**
  * Docked size and inset, CSS px. DOCK_UNIT converts world units to pixels, so the
  * cube's visible half edge parks at DOCK_UNIT * cubeHalf ≈ 43px.
  */
@@ -133,16 +102,6 @@ const DOCK_INSET = 104;
  * higher ratio would resolve anyway.
  */
 const MAX_DPR = 1.4;
-
-/** Past this the surface would tilt out of its own column. */
-const ROCK_MAX = 0.11;
-
-/**
- * How far past the body's own half height the waterline travels at each end. The
- * silhouette wobbles and the line itself is wobbled, so stopping exactly at the
- * extents would clip the last sliver off instead of emptying it.
- */
-const FILL_MARGIN = 1.2;
 
 /**
  * Where the cube parks and how far it visibly reaches, CSS px. Exported because the
@@ -197,9 +156,6 @@ export function createBlobRenderer(canvas: HTMLCanvasElement): BlobRenderer | nu
     clip: gl.getUniformLocation(program, "uClip"),
     half: gl.getUniformLocation(program, "uHalf"),
     cubeHalf: gl.getUniformLocation(program, "uCubeHalf"),
-    fill: gl.getUniformLocation(program, "uFill"),
-    wave: gl.getUniformLocation(program, "uWave"),
-    tilt: gl.getUniformLocation(program, "uTilt"),
     fade: gl.getUniformLocation(program, "uFade"),
     cube: gl.getUniformLocation(program, "uCube"),
     flow: gl.getUniformLocation(program, "uFlow"),
@@ -226,15 +182,12 @@ export function createBlobRenderer(canvas: HTMLCanvasElement): BlobRenderer | nu
   };
 
   // Eased state. `x`/`y` are CSS px. There is one body and it changes column in a
-  // single frame — it never travels. `fill` is the level itself, 0..1: the column
-  // fills as the pointer enters the grid and empties as it leaves, and a change of
-  // column leaves it alone, since the liquid does not drain on the way across.
+  // single frame — it never travels.
   const eased = {
     x: 0,
     y: 0,
     width: 0,
     height: 0,
-    fill: 0,
     cube: 0,
     unit: 0,
     /** How far into its tumble the cube is, 0 at rest and 1 held under the pointer. */
@@ -264,7 +217,6 @@ export function createBlobRenderer(canvas: HTMLCanvasElement): BlobRenderer | nu
     height: number;
     unit: number;
     cube: number;
-    fill: number;
     clipL: number;
     clipR: number;
     fade: number;
@@ -274,13 +226,12 @@ export function createBlobRenderer(canvas: HTMLCanvasElement): BlobRenderer | nu
   let flow = 0;
   let slosh = 0;
   let prev = { x: 0, y: 0 };
-  // Surface state, shared by every body drawn this frame: ripple amplitude, tilt,
-  // and the tilt's velocity for the spring. `prevFill` is what drives both — it is
-  // the movement of the level, not the level itself, that agitates the surface.
-  let wave = WAVE_IDLE;
-  let rock = 0;
-  let rockVel = 0;
-  let prevFill = 0;
+  /**
+   * Whether a body is on screen at all. Coming and going is the same cut as a change
+   * of column, with the same short fade behind it — there is no level rising or
+   * falling any more, so this is a flag rather than a quantity.
+   */
+  let present = false;
   let dpr = 1;
   let cssH = 0;
   let cssW = 0;
@@ -338,6 +289,30 @@ export function createBlobRenderer(canvas: HTMLCanvasElement): BlobRenderer | nu
       seeded = true;
     }
 
+    // Coming and going. Entering the grid and leaving it are the same cut as a change
+    // of column, and take the same short fade: appearing holds the body back for one
+    // HANDOFF, and leaving hands it to the list of copies going out. There used to be
+    // a level rising and falling here instead — a different idea of the page.
+    if (target.active !== present) {
+      if (target.active) {
+        handoff = 1;
+      } else {
+        leaving.push({
+          x: eased.x,
+          y: eased.y,
+          width: eased.width,
+          height: eased.height,
+          unit: eased.unit,
+          cube: eased.cube,
+          clipL: clip.left,
+          clipR: clip.right,
+          fade: 1,
+        });
+        if (leaving.length > MAX_LEAVING) leaving.shift();
+      }
+      present = target.active;
+    }
+
     if (target.docked) {
       // Leaving the grid: fly to the corner while shrinking. The clip opens to the
       // whole viewport, since there is no column left to be contained by.
@@ -364,7 +339,7 @@ export function createBlobRenderer(canvas: HTMLCanvasElement): BlobRenderer | nu
         // rewritten in this one frame. The only thing that is not instant is the
         // brief fade on either side of it — the column being left keeps its own
         // copy to go out on, and the new one is held back by `handoff`.
-        if (eased.fill > 0.004) {
+        if (present) {
           leaving.push({
             x: eased.x,
             y: eased.y,
@@ -372,7 +347,6 @@ export function createBlobRenderer(canvas: HTMLCanvasElement): BlobRenderer | nu
             height: eased.height,
             unit: eased.unit,
             cube: eased.cube,
-            fill: eased.fill,
             clipL: clip.left,
             clipR: clip.right,
             fade: 1,
@@ -402,34 +376,6 @@ export function createBlobRenderer(canvas: HTMLCanvasElement): BlobRenderer | nu
     // way, which is what makes leaving read as unwinding rather than as a release.
     eased.hover = ease(eased.hover, target.cubeHover ? 1 : 0, 0.002, dt);
 
-    // The level rises while a column is hovered and falls once none is. Nothing here
-    // knows which column it is — leaving the grid from one and coming back to
-    // another is the same fall and rise.
-    if (target.active) {
-      // A steady pour: constant rate, so the surface climbs at one speed and the
-      // rock below is what softens the start and the stop.
-      eased.fill = Math.min(1, eased.fill + dt / FILL);
-    } else {
-      const rate = (DRAIN_FLOOR + DRAIN_HEAD * Math.sqrt(eased.fill)) / FILL;
-      eased.fill = Math.max(0, eased.fill - rate * dt);
-    }
-
-    // The surface answers to how fast the level is moving, not to where it is.
-    const levelStep = eased.fill - prevFill;
-    prevFill = eased.fill;
-    const levelRate = Math.min((Math.abs(levelStep) / Math.max(dt, 1e-4)) * FILL, 1);
-
-    // Agitation: up the instant the level moves, slow to settle once it stops.
-    const wantWave = WAVE_IDLE + levelRate * WAVE_MOVE;
-    wave = ease(wave, wantWave, wantWave > wave ? 0.02 : 0.4, dt);
-
-    // Rocking: the moving level is an impulse on a damped spring. Semi-implicit
-    // Euler, and dt is already capped upstream, so it cannot wind itself up.
-    rockVel +=
-      levelStep * ROCK_DRIVE -
-      (ROCK_OMEGA * ROCK_OMEGA * rock + 2 * ROCK_DAMP * ROCK_OMEGA * rockVel) * dt;
-    rock = Math.max(-ROCK_MAX, Math.min(ROCK_MAX, rock + rockVel * dt));
-
     // Linear, so both halves of the hand-off actually finish — an easing asymptote
     // would leave a permanent sliver of the old column on screen.
     const step = dt / HANDOFF;
@@ -449,7 +395,7 @@ export function createBlobRenderer(canvas: HTMLCanvasElement): BlobRenderer | nu
     // Advance a continuous phase — modulating time * speed would jump the noise.
     flow += dt * (reduced ? 0 : FLOW_BASE + slosh * FLOW_SLOSH);
 
-    if (eased.fill <= 0 && leaving.length === 0 && !target.active) {
+    if (!present && leaving.length === 0) {
       gl.clear(gl.COLOR_BUFFER_BIT);
       // Nothing to draw and nothing incoming: park the loop until wake().
       if ((idle += dt) > 0.75) {
@@ -467,11 +413,6 @@ export function createBlobRenderer(canvas: HTMLCanvasElement): BlobRenderer | nu
     gl.uniform1f(u.flow, flow);
     gl.uniform1f(u.slosh, slosh);
     gl.uniform1f(u.hover, eased.hover);
-    // Surface shape is frame-wide: the wave is a fraction of a world unit and the
-    // tilt is a slope, so both stay correct whatever body they are applied to.
-    gl.uniform1f(u.wave, wave);
-    gl.uniform1f(u.tilt, rock);
-
     // No two bodies share a column, so the clip windows never overlap and straight
     // alpha blending is enough to draw them one after the other.
     for (const body of leaving) {
@@ -482,17 +423,18 @@ export function createBlobRenderer(canvas: HTMLCanvasElement): BlobRenderer | nu
     }
 
     const unit = eased.unit || eased.width / 2;
-    drawBody(
-      eased,
-      1 - handoff,
-      clip.left,
-      clip.right,
-      // Docked or on its way home the pointer is somewhere else entirely on the
-      // page — letting it aim the bulge from that far away just makes the cube
-      // lurch, and mid-flight it would lurch differently every frame.
-      target.docked || target.returning ? 0 : (target.pointerX - eased.x) / unit,
-      target.docked || target.returning ? 0 : -(target.pointerY - eased.y) / unit,
-    );
+    if (present)
+      drawBody(
+        eased,
+        1 - handoff,
+        clip.left,
+        clip.right,
+        // Docked or on its way home the pointer is somewhere else entirely on the
+        // page — letting it aim the bulge from that far away just makes the cube
+        // lurch, and mid-flight it would lurch differently every frame.
+        target.docked || target.returning ? 0 : (target.pointerX - eased.x) / unit,
+        target.docked || target.returning ? 0 : -(target.pointerY - eased.y) / unit,
+      );
   }
 
   /**
@@ -508,7 +450,6 @@ export function createBlobRenderer(canvas: HTMLCanvasElement): BlobRenderer | nu
       height: number;
       unit: number;
       cube: number;
-      fill: number;
     },
     fade: number,
     clipL: number,
@@ -516,7 +457,7 @@ export function createBlobRenderer(canvas: HTMLCanvasElement): BlobRenderer | nu
     aimX: number,
     aimY: number,
   ) {
-    if (body.fill <= 0 || fade < 0.004) return;
+    if (fade < 0.004) return;
 
     // In the grid one world unit is half a column, so the pillar's height in world
     // units is just the column's aspect ratio. Docked, the unit shrinks instead and
@@ -528,17 +469,10 @@ export function createBlobRenderer(canvas: HTMLCanvasElement): BlobRenderer | nu
     );
 
     // gl_FragCoord has its origin bottom-left, CSS coordinates top-left.
-    const centerY = (cssH - body.y) * dpr;
-    // The waterline runs between the body's own extents, so it empties a docked
-    // cube over the cube rather than over the height of the viewport it left.
-    const reach = halfY * unit * dpr * FILL_MARGIN;
-    const fill = centerY - reach + body.fill * reach * 2;
-
-    gl.uniform2f(u.center, body.x * dpr, centerY);
+    gl.uniform2f(u.center, body.x * dpr, (cssH - body.y) * dpr);
     gl.uniform1f(u.unit, unit * dpr);
     gl.uniform2f(u.clip, clipL * dpr, clipR * dpr);
     gl.uniform3f(u.half, HALF_X, halfY, HALF_Z);
-    gl.uniform1f(u.fill, fill);
     gl.uniform1f(u.fade, fade);
     gl.uniform1f(u.cube, body.cube);
     gl.uniform2f(u.aim, aimX, aimY);

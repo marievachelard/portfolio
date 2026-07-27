@@ -31,9 +31,6 @@ uniform float uUnit;     // device px per world unit (half a column = 1.0)
 uniform vec2  uClip;     // left / right clip edges, device px — always on a column boundary
 uniform vec3  uHalf;     // half extents of the liquid pillar, world units
 uniform float uCubeHalf; // half edge of the crystallised cube, world units
-uniform float uFill;     // waterline, device px on gl_FragCoord.y — the body exists below it only
-uniform float uWave;     // ripple amplitude on that line, as a fraction of a world unit
-uniform float uTilt;     // and its tilt, device px per device px — the surface rocking
 uniform float uFade;     // 0..1 opacity only — softens the cut between columns without resizing
 uniform float uCube;     // 0 = liquid pillar, 1 = crystallised cube
 uniform float uFlow;     // continuous animation phase (never time * speed)
@@ -185,9 +182,9 @@ float shape(vec3 p){
   return d;
 }
 
-// The body is always at full size. Hover in and out are a rising and falling
-// waterline (see uFill), not a scale — a column fills and empties, it does not
-// grow and shrink.
+// The body is always at full size. Coming and going is a cut with a short fade on it
+// (see uFade), the same as a change of column — not a scale, and no longer the rising
+// and falling level this used to carry.
 float sdf(vec3 p){
   return shape(p);
 }
@@ -256,18 +253,6 @@ void main(){
   // on a column boundary, so a body in transit is cut by the grid itself.
   float gate = smoothstep(uClip.x, uClip.x + 1.0, gl_FragCoord.x)
              * (1.0 - smoothstep(uClip.y - 1.0, uClip.y, gl_FragCoord.x));
-
-  // Waterline. The column fills from the bottom and empties from the top, so the
-  // body only exists below it. It is not a straight edge: it tilts while the level
-  // rocks and ripples on the shared flow phase. A level that moves like a ruler
-  // reads as a wipe over the liquid rather than as the top of it. Three octaves,
-  // weights summing to 1, so uWave is the actual peak in world units.
-  float sx = gl_FragCoord.x - uCenter.x;
-  float ripple = sin(sx * 0.017 + uFlow * 2.3) * 0.60
-               + sin(sx * 0.041 - uFlow * 1.5) * 0.28
-               + sin(sx * 0.007 + uFlow * 0.9) * 0.12;
-  float line = uFill + uTilt * sx + uWave * uUnit * ripple;
-  gate *= 1.0 - smoothstep(line - 1.0, line, gl_FragCoord.y);
 
   if (uFade < 0.004 || gate < 0.002) discard;
 
@@ -347,10 +332,6 @@ void main(){
               + 0.07 * clamp(thickness, 0.0, 2.0);
   alpha += spec * 0.55;
   alpha *= mix(1.0, 1.12, uCube);            // the cube sits a touch more solid
-
-  // The surface is denser than the body beneath it. Without that band the level
-  // reads as a cut through the liquid; with it, it reads as its top.
-  alpha += (1.0 - smoothstep(0.0, uUnit * 0.055, line - gl_FragCoord.y)) * 0.13;
 
   fragColor = vec4(clamp(col, 0.0, 1.0), clamp(alpha, 0.0, 1.0) * uFade * gate);
 }
