@@ -131,18 +131,9 @@ body {
    which is what leaves the strip showing the digit it landed on. */
 .reel-window {
   display: inline-block;
-  height: var(--cell, 1em);
+  height: 1em;
   overflow: hidden;
   vertical-align: baseline;
-}
-
-/* The same strip at heading size. Two differences: the cell is taller, because names
-   have descenders and a one-em window clips them; and it is a block, because the
-   counter sits on a baseline in a flex row while this is a heading on its own line. */
-.reel-line {
-  display: block;
-  height: var(--cell);
-  overflow: hidden;
 }
 
 .reel-cells {
@@ -151,8 +142,8 @@ body {
 
 .reel-cells > span {
   display: block;
-  height: var(--cell, 1em);
-  line-height: var(--cell, 1em);
+  height: 1em;
+  line-height: 1em;
 }
 
 .reel-roll {
@@ -161,10 +152,10 @@ body {
 
 @keyframes reel {
   from {
-    transform: translateY(calc(var(--reel-from) * -1 * var(--cell, 1em)));
+    transform: translateY(calc(var(--reel-from) * -1em));
   }
   to {
-    transform: translateY(calc(var(--reel-to) * -1 * var(--cell, 1em)));
+    transform: translateY(calc(var(--reel-to) * -1em));
   }
 }
 

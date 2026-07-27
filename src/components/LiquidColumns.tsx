@@ -618,45 +618,17 @@ export function LiquidColumns() {
             >
             {/* Out quickly, back more slowly, and the wording only swaps once it has
                 gone — so the old line and the new one are never both legible. */}
-            <article>
-              {/* The name turns over rather than fading, on the same strip mechanism
-                  and the same 650ms as the counter — and off the same index, so the
-                  two move together. It sits outside the fade below for that reason:
-                  inside it, the roll would be happening behind a dissolve. */}
+            <article
+              style={{
+                opacity: textSettled ? 1 : 0,
+                transition: `opacity ${
+                  textSettled ? TEXT_IN_MS : TEXT_OUT_MS
+                }ms linear`,
+              }}
+            >
               <h2 className="text-lg font-medium tracking-tight text-neutral-900 sm:text-2xl">
-                <span
-                  className="reel-line"
-                  style={{ "--cell": "1.4em" } as React.CSSProperties}
-                >
-                  <span
-                    // Keyed on the entry, so the roll replays on each change.
-                    key={entry.index}
-                    className="reel-cells reel-roll"
-                    style={
-                      {
-                        "--cell": "1.4em",
-                        // Straight indices: the list is clamped at both ends, so
-                        // there is no wrap to reckon with and the strip is just the
-                        // names in order.
-                        "--reel-from": entry.from,
-                        "--reel-to": entry.index,
-                      } as React.CSSProperties
-                    }
-                  >
-                    {EXPERIENCE.map((item) => (
-                      <span key={item.title}>{item.title}</span>
-                    ))}
-                  </span>
-                </span>
+                {shown.title}
               </h2>
-              <div
-                style={{
-                  opacity: textSettled ? 1 : 0,
-                  transition: `opacity ${
-                    textSettled ? TEXT_IN_MS : TEXT_OUT_MS
-                  }ms linear`,
-                }}
-              >
               <p className="mt-2 font-mono text-[10px] tracking-[0.2em] tabular-nums text-neutral-400 sm:text-xs">
                 {shown.dates}
               </p>
@@ -669,7 +641,6 @@ export function LiquidColumns() {
               <p className="mt-8 max-w-[min(48ch,44vw)] text-sm leading-relaxed text-neutral-600 sm:mt-10 sm:text-base">
                 {shown.summary}
               </p>
-              </div>
             </article>
             </div>
           </div>
@@ -739,9 +710,14 @@ export function LiquidColumns() {
       />
 
       {/* Named only while the pointer is on it. Placed off the cube's own parked
-          geometry — just past how far its tilted corners reach, centred on its
-          middle — so it sits beside the cube and not beside the hit area, which is
-          a square much larger than the cube itself.
+          geometry — centred on its middle, its baseline clearing how far the tilted
+          corners actually reach — so it sits over the cube and not over the hit area,
+          which is a square much larger than the cube itself.
+
+          The floor on `top` is for very short or narrow windows, where the cube parks
+          closer to the corner and there is barely room above it: without it the label
+          would ride off the top of the page. It can end up grazing the cube there,
+          which is the lesser problem.
 
           Marked aria-hidden: the button already carries the accessible name, and
           this would only say it twice. */}
@@ -749,9 +725,9 @@ export function LiquidColumns() {
         aria-hidden
         className="pointer-events-none absolute font-mono text-[10px] tracking-[0.2em] text-neutral-400 sm:text-xs"
         style={{
-          left: dock.x + dock.reach + 16,
-          top: dock.y,
-          transform: "translateY(-50%)",
+          left: dock.x,
+          top: Math.max(20, dock.y - dock.reach - 12),
+          transform: "translate(-50%, -100%)",
           opacity: cubeHovered ? 1 : 0,
           // Slower in than out on purpose: leaving, it has to be gone before the block
           // below has moved far, or it reads as lingering rather than as first out.
