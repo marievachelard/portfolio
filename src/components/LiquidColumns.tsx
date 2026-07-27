@@ -91,7 +91,8 @@ export function LiquidColumns() {
     if (i < 0) return;
     const rect = rects.current[i];
 
-    // Leaving a column melts the crystal: liquid is what flows to the next one.
+    // Leaving a column melts the crystal — the body that re-forms in the next one
+    // is liquid again.
     if (i !== hovered.current) {
       hovered.current = i;
       r.target.crystal = false;

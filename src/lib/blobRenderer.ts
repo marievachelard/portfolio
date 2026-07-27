@@ -77,6 +77,13 @@ const DOCK_INSET = 104;
  */
 const MAX_DPR = 1.4;
 
+/**
+ * Seconds to drain the body out of the column being left. Linear rather than
+ * eased so the hand-off has a definite end: the body only re-forms in the new
+ * column once this has run out, and an asymptote never gets there.
+ */
+const FADE_OUT = 0.15;
+
 function compile(gl: WebGL2RenderingContext, type: number, src: string) {
   const sh = gl.createShader(type)!;
   gl.shaderSource(sh, src);
@@ -137,13 +144,13 @@ export function createBlobRenderer(canvas: HTMLCanvasElement): BlobRenderer | nu
     pointerY: 0,
   };
 
-  // Eased state. `x`/`y` are CSS px; the body is never snapped, so moving the
-  // pointer to another column reads as the same liquid being poured across.
+  // Eased state. `x`/`y` are CSS px. The body never travels between columns: it
+  // drains out of the one being left and re-forms in place in the next, so `x` is
+  // only ever repositioned while nothing is on screen to see it move.
   const eased = { x: 0, y: 0, width: 0, height: 0, amount: 0, cube: 0, unit: 0 };
   // Clip window, CSS px. Both edges are only ever set to a column boundary — never
-  // interpolated — so the cut never lands mid-column. While the body is in transit
-  // the window spans every column it straddles, and the grey rules drawn over the
-  // canvas slice it up; it snaps back to the single column once the body arrives.
+  // interpolated — so the cut never lands mid-column, and the body is always
+  // contained by exactly the column it lives in.
   const clip = { left: 0, right: 0 };
   let flow = 0;
   let slosh = 0;
@@ -207,6 +214,12 @@ export function createBlobRenderer(canvas: HTMLCanvasElement): BlobRenderer | nu
       seeded = true;
     }
 
+    // Set while the body still has to clear the column it is leaving. Held for a
+    // frame at a time rather than kept as state: the test is simply "is what is on
+    // screen somewhere other than where the pointer is", so backtracking to the
+    // original column mid-drain cancels the hand-off on its own.
+    let draining = false;
+
     if (target.docked) {
       // Leaving the grid: fly to the corner while shrinking. The clip opens to the
       // whole viewport, since there is no column left to be contained by.
@@ -215,27 +228,35 @@ export function createBlobRenderer(canvas: HTMLCanvasElement): BlobRenderer | nu
       clip.left = 0;
       clip.right = cssW;
     } else if (target.active) {
-      // X eases slowest: the lateral trip between columns is the moment the body
-      // is meant to look like it is being poured across.
-      eased.x = ease(eased.x, target.colCenterX, 0.0006, dt);
-      eased.y = ease(eased.y, target.colCenterY, 0.004, dt);
-      eased.width = ease(eased.width, wantW, 0.0005, dt);
-      eased.height = ease(eased.height, wantH, 0.0005, dt);
-
-      const left = target.colCenterX - wantW / 2;
-      const right = target.colCenterX + wantW / 2;
-      if (Math.abs(eased.x - target.colCenterX) > wantW * 0.04) {
-        // In transit: widen to cover the source column too, so no liquid is cut
-        // off anywhere except on a column boundary.
-        clip.left = Math.min(clip.left, left);
-        clip.right = Math.max(clip.right, right);
+      // Half a column is the widest the geometry can drift under a resize and the
+      // narrowest a real column change can be, so it separates the two cleanly.
+      if (Math.abs(eased.x - target.colCenterX) > wantW * 0.5) {
+        if (eased.amount < 0.02) {
+          // Nothing left on screen: reposition outright. Easing across is exactly
+          // the travel this is meant to avoid.
+          eased.x = target.colCenterX;
+          eased.y = target.colCenterY;
+          eased.width = wantW;
+          eased.height = wantH;
+          clip.left = target.colCenterX - wantW / 2;
+          clip.right = target.colCenterX + wantW / 2;
+        } else {
+          draining = true;
+        }
       } else {
-        clip.left = left;
-        clip.right = right;
+        // Same column — this only ever absorbs layout drift from a resize.
+        eased.x = ease(eased.x, target.colCenterX, 0.0006, dt);
+        eased.y = ease(eased.y, target.colCenterY, 0.004, dt);
+        eased.width = ease(eased.width, wantW, 0.0005, dt);
+        eased.height = ease(eased.height, wantH, 0.0005, dt);
+        clip.left = target.colCenterX - wantW / 2;
+        clip.right = target.colCenterX + wantW / 2;
       }
     }
     eased.unit = ease(eased.unit, wantUnit, 0.0009, dt);
-    eased.amount = ease(eased.amount, target.active ? 1 : 0, 0.0009, dt);
+    eased.amount = draining
+      ? Math.max(0, eased.amount - dt / FADE_OUT)
+      : ease(eased.amount, target.active ? 1 : 0, 0.0009, dt);
     eased.cube = ease(eased.cube, target.crystal ? 1 : 0, 0.0022, dt);
 
     // Pointer velocity feeds the slosh: fast attack, slow settle.
