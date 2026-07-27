@@ -15,6 +15,11 @@ export function LiquidColumns() {
   // Column geometry is cached and refreshed on resize — reading it back on every
   // pointermove would force a layout on each mouse event.
   const rects = useRef<DOMRect[]>([]);
+  // Held so a pointermove that lands outside every cached rect can ask for a fresh
+  // reading instead of giving up. A stale cache used to be silent and total: track()
+  // returned before waking the renderer, so the blob could not be summoned at all
+  // until the window was resized.
+  const remeasure = useRef<(() => void) | null>(null);
   const hovered = useRef(-1);
   const [opened, setOpened] = useState<number | null>(null);
   // Same value as `opened`, kept for the pointer handlers to read. They can fire in
@@ -47,13 +52,23 @@ export function LiquidColumns() {
         el.getBoundingClientRect(),
       );
     };
+    remeasure.current = measure;
     measure();
+    // Again after a frame: the first reading can land before layout has settled on
+    // its final dvh, and a wrong one is not self-correcting.
+    const settle = requestAnimationFrame(measure);
 
     const ro = new ResizeObserver(measure);
     ro.observe(grid);
+    // The observer only fires when the grid's own box changes. A viewport change
+    // that leaves it the same size still moves the columns.
+    window.addEventListener("resize", measure);
 
     return () => {
+      cancelAnimationFrame(settle);
+      window.removeEventListener("resize", measure);
       ro.disconnect();
+      remeasure.current = null;
       renderer.current?.destroy();
       renderer.current = null;
     };
@@ -113,9 +128,16 @@ export function LiquidColumns() {
     r.target.pointerY = e.clientY;
     if (openedRef.current !== null) return;
 
-    const i = rects.current.findIndex(
-      (rect) => e.clientX >= rect.left && e.clientX < rect.right,
-    );
+    const hit = (x: number) =>
+      rects.current.findIndex((rect) => x >= rect.left && x < rect.right);
+    let i = hit(e.clientX);
+    if (i < 0) {
+      // Nothing matched, so the cache is wrong rather than the pointer being
+      // somewhere impossible — the grid covers the whole viewport. Read it again
+      // rather than staying deaf until the next resize.
+      remeasure.current?.();
+      i = hit(e.clientX);
+    }
     if (i < 0) return;
     const rect = rects.current[i];
 
@@ -249,6 +271,7 @@ export function LiquidColumns() {
         className="absolute left-0 top-0 h-40 w-40 cursor-pointer"
         style={{ pointerEvents: settled ? "auto" : "none" }}
       />
+
     </main>
   );
 }

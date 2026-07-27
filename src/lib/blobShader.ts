@@ -95,7 +95,9 @@ float snoise(vec3 v){
 
 // Weighted heavily toward the first octave: a strong second octave turns the
 // surface into stucco instead of liquid.
-float fbm(vec3 p){ return snoise(p) * 0.80 + snoise(p * 2.1) * 0.20; }
+float fbm(vec3 p){
+  return snoise(p) * 0.80 + snoise(p * 2.1) * 0.20;
+}
 
 /* ---------------------------- the surface ---------------------------- */
 
@@ -108,8 +110,10 @@ mat3 rotX(float a){ float c = cos(a), s = sin(a); return mat3(1,0,0, 0,c,s, 0,-s
 mat3 rotY(float a){ float c = cos(a), s = sin(a); return mat3(c,0,-s, 0,1,0, s,0,c); }
 
 // Noise amplitude is the one thing that breaks the Lipschitz bound (one step of
-// d can overshoot the perturbed surface), so STEP stays well under 1.
-const float SKIN = 0.21;
+// d can overshoot the perturbed surface), so STEP stays well under 1. SKIN was
+// tuned up from 0.21 to here, which is about as far as the march will follow it —
+// past this the surface starts showing pinholes.
+const float SKIN = 0.365;
 const float STEP = 0.40;
 
 float shape(vec3 p){
@@ -127,12 +131,11 @@ float shape(vec3 p){
   // rather than as a lump. Edges stay softly rounded for the same reason.
   float fluid = mix(1.0, 0.40, hard);
 
-  // A slow serpentine sway: the pillar leans and winds up its own height, which
-  // is most of what makes a tall body of liquid look like it is standing rather
-  // than extruded.
+  // There used to be a slow serpentine sway here — the pillar leaning and winding
+  // up its own height. It was tuned to zero: this body is thick and brushed rather
+  // than standing and flowing, and the lean read as a wobble on it. Bringing it
+  // back means two sines per SDF evaluation, so it is gone rather than scaled by 0.
   vec3 q = p;
-  q.x += sin(q.y * 1.45 - t * 0.85) * 0.075 * fluid;
-  q.z += cos(q.y * 1.15 - t * 0.65) * 0.060 * fluid;
 
   q = rotX(-0.52 * turn) * rotY((0.66 + t * 0.13) * turn) * q;
 
@@ -145,7 +148,7 @@ float shape(vec3 p){
   // frequency rises as the body contracts, keeping the ripples the same apparent
   // size on screen instead of stretching into slabs on the smaller cube.
   float amp = SKIN * fluid;
-  float freq = mix(1.05, 1.7, form);
+  float freq = mix(1.05, 1.70, form);
 
   // Hold the corners. Damp the ripples wherever two box faces meet — measured by
   // how far the dominant axis leads the second one — so the cube keeps readable
@@ -212,11 +215,15 @@ vec3 thinFilm(float thickness, float ndv){
   // Damped once crystallised: across a flat face the depth ramps linearly and
   // fast, which at the liquid's weighting packs the fringes tight enough to
   // moiré. The cube wants a broad hue per face instead.
-  float band = thickness * mix(1.75, 0.7, uCube) + (1.0 - ndv) * 1.7;
+  // Wide bands: at 0.1 the fringes are broad enough to read as a sheen over the
+  // body rather than as oil-slick rings. The cube keeps 0.4 of that.
+  float band = thickness * mix(0.10, 0.04, uCube) + (1.0 - ndv) * 1.7;
   vec3 invLambda = vec3(1.0/0.63, 1.0/0.52, 1.0/0.45);
   vec3 c = 0.5 + 0.5 * cos(PI2 * band * invLambda + vec3(0.0, 0.55, 1.15));
   // Lift toward pastel: full-swing interference reads as garish on white.
-  return mix(vec3(0.80, 0.84, 0.92), c, 0.86);
+  // Neutral grey base with the interference dialled most of the way out: brushed
+  // glass, not an oil slick.
+  return mix(vec3(0.7804), c, 0.26);
 }
 
 // Near-orthographic: a tall pillar under a real perspective would splay out in
@@ -315,14 +322,13 @@ void main(){
   vec3 col = irid;
   col *= mix(0.84, 1.06, diff);              // relief modelling
   col *= 0.90 + 0.20 * ndv;                  // slight core darkening
-  col += rim * irid * 0.55;                  // coloured rim glow
   col = mix(col, vec3(1.0), fres * 0.32);    // glancing angles go white
   col += spec * mix(1.0, 1.35, uCube);       // crystal takes a harder highlight
 
   // Translucency: nearly clear looking straight through, denser at grazing
   // angles and on the rim. Thickness adds a little body so the interference
   // bands stay legible against the white column.
-  float alpha = 0.28
+  float alpha = 0.51
               + 0.34 * rim
               + 0.26 * fres
               + 0.07 * clamp(thickness, 0.0, 2.0);

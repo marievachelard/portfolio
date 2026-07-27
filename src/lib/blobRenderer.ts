@@ -42,67 +42,59 @@ export type BlobRenderer = {
 };
 
 /**
- * World units: half a column is exactly 1.0, so the pillar's half extents are
- * read straight off the column's aspect ratio.
+ * World units: half a column is exactly 1.0, so the pillar's half extents are read
+ * straight off the column's aspect ratio.
+ *
+ * These were briefly uniforms fed by a dev panel; the values it settled on are back
+ * here as constants. A uniform that never changes is worse than a literal, in the
+ * shader especially, where it blocks constant folding inside the march.
  */
+
 /**
  * The pillar overflows its column on purpose and is clipped to it in the shader:
  * that is what gives it dead-straight edges against the grey rules while the
- * surface keeps deforming. 1.16 minus the 0.13 noise skin still leaves the
- * narrowest point of the silhouette outside the column, so the edge never
- * develops a notch.
+ * surface keeps deforming. 1.16 minus the noise skin still leaves the narrowest
+ * point of the silhouette outside the column, so the edge never develops a notch.
  */
 const HALF_X = 1.16;
 /**
- * Deliberately shallow — a standing sheet of liquid, not a block. The thinner
- * the body, the more the light's path through it varies with the rippling skin,
- * and the stronger the thin-film colour reads.
+ * Depth. Tuned up from the 0.34 it started at: the thin sheet made the thin-film
+ * colour swing hard with every ripple, and this look wants a body you read as
+ * frosted rather than as an oil film.
  */
-const HALF_Z = 0.34;
+const HALF_Z = 0.72;
 /** Same idea vertically — it runs off the top and bottom of the viewport. */
 const OVERFLOW_Y = 1.14;
 /**
  * Tilted into iso view a cube's corners project out to ~1.40x its half edge, so
  * 0.58 + the noise skin lands at ~0.90 of the half column — it stays clear of the
- * rules under its own steam, never relying on the clip. Sized generously on
- * purpose: it carries the same absolute ripple amplitude as the pillar, and a
- * smaller cube would be swallowed by it.
+ * rules under its own steam, never relying on the clip.
  */
 const CUBE_HALF = 0.58;
 
-/**
- * Docked size and inset, CSS px. DOCK_UNIT converts world units to pixels, so the
- * cube's visible half edge parks at DOCK_UNIT * CUBE_HALF ≈ 43px.
- */
-const DOCK_UNIT = 74;
-const DOCK_INSET = 104;
-
-/**
- * Capped low on purpose: the pillar covers a whole column, so every extra device
- * pixel is a full two-pass raymarch. The surface has no fine detail that a
- * higher ratio would resolve anyway.
- */
-const MAX_DPR = 1.4;
+/** How fast the flow phase advances at rest, and how much the pointer adds. */
+const FLOW_BASE = 0.41;
+const FLOW_SLOSH = 1.6;
+/** Pointer speed, px/s, that counts as full slosh. */
+const SLOSH_REF = 900;
 
 /**
  * Seconds the change of column is softened over. Short on purpose: the change is
- * still meant to read as a cut, this only takes the hard edge off both sides of
- * it — long enough not to sting, too short to be a transition of its own.
+ * still meant to read as a cut, this only takes the hard edge off both sides of it.
  */
 const HANDOFF = 0.1;
 
 /**
- * Seconds to fill an empty column. Integrated as a level rather than played as a
- * timed curve, so reversing mid-way picks up where it stands instead of jumping to
- * wherever the other curve happens to be at that point.
+ * Seconds to fill an empty column, integrated as a level rather than played as a
+ * timed curve, so reversing mid-way picks up where it stands.
  */
 const FILL = 0.45;
 
 /**
  * Emptying is not filling in reverse. A tank drains under its own head, so it goes
- * fastest when it is full and lingers at the bottom — Torricelli, rate ∝ √level.
- * The floor keeps the last sliver from taking forever; the pair is scaled to empty
- * in roughly the time it takes to fill.
+ * fastest when it is full and lingers at the bottom — Torricelli, rate proportional
+ * to the square root of the level. The floor keeps the last sliver from taking
+ * forever.
  */
 const DRAIN_HEAD = 1.3;
 const DRAIN_FLOOR = 0.35;
@@ -122,6 +114,21 @@ const WAVE_MOVE = 0.035;
 const ROCK_DRIVE = 1.6;
 const ROCK_OMEGA = 9;
 const ROCK_DAMP = 0.22;
+
+/**
+ * Docked size and inset, CSS px. DOCK_UNIT converts world units to pixels, so the
+ * cube's visible half edge parks at DOCK_UNIT * cubeHalf ≈ 43px.
+ */
+const DOCK_UNIT = 74;
+const DOCK_INSET = 104;
+
+/**
+ * Capped low on purpose: the pillar covers a whole column, so every extra device
+ * pixel is a full two-pass raymarch. The surface has no fine detail that a
+ * higher ratio would resolve anyway.
+ */
+const MAX_DPR = 1.4;
+
 /** Past this the surface would tilt out of its own column. */
 const ROCK_MAX = 0.11;
 
@@ -403,11 +410,11 @@ export function createBlobRenderer(canvas: HTMLCanvasElement): BlobRenderer | nu
     const dx = target.pointerX - prev.x;
     const dy = target.pointerY - prev.y;
     prev = { x: target.pointerX, y: target.pointerY };
-    const vel = Math.min(Math.hypot(dx, dy) / Math.max(dt, 0.001) / 900, 1);
+    const vel = Math.min(Math.hypot(dx, dy) / Math.max(dt, 0.001) / SLOSH_REF, 1);
     slosh = ease(slosh, vel, vel > slosh ? 0.02 : 0.35, dt);
 
     // Advance a continuous phase — modulating time * speed would jump the noise.
-    flow += dt * (reduced ? 0 : 0.55 + slosh * 1.6);
+    flow += dt * (reduced ? 0 : FLOW_BASE + slosh * FLOW_SLOSH);
 
     if (eased.fill <= 0 && leaving.length === 0 && !target.active) {
       gl.clear(gl.COLOR_BUFFER_BIT);
