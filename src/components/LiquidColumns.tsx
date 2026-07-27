@@ -134,6 +134,11 @@ const BLOCK_GAP = 64;
 const BLOCK_H = 278;
 const IMAGE_REST_Y = TITLE_TOP + TITLE_LINE + BLOCK_GAP + BLOCK_H / 2;
 
+/** The share of a frame added to the gap between two pictures, mirroring the 60% in
+    `.frame-layer`. The two have to agree: it is how JS works out where a picture
+    actually is, while the CSS is what puts it there. */
+const FRAME_TAIL = 0.6;
+
 /** How long the grey is held after the pointer has gone, so the disc can finish
     closing before the colour comes back. A little over the transition in the CSS. */
 const LENS_HOLD = 280;
@@ -176,7 +181,11 @@ export function LiquidColumns() {
   const mainRef = useRef<HTMLElement>(null);
   /** Where the list actually is, and where the wheel has asked it to go. */
   const frameRef = useRef<HTMLDivElement>(null);
-  const frameRect = useRef<DOMRect | null>(null);
+  const frameGeom = useRef<{ box: DOMRect; gap: number } | null>(null);
+  /** Where the hand last was. The pictures move under it, so the reckoning has to be
+      redone when nothing about the pointer has changed. */
+  const ptr = useRef({ x: -1, y: -1 });
+  const probe = useRef<(() => void) | null>(null);
   const overFrame = useRef(false);
   const [lensOn, setLensOn] = useState(false);
   const [lensGrey, setLensGrey] = useState(false);
@@ -238,6 +247,11 @@ export function LiquidColumns() {
       setEntry((was) =>
         was.index === idx ? was : { index: idx, from: was.index },
       );
+
+      // The hand can sit perfectly still while a picture slides out from under it, so
+      // the glass cannot be left to pointer moves alone: it is asked again on every
+      // frame the strip moves.
+      probe.current?.();
     };
 
     const tick = (now: number) => {
@@ -315,8 +329,9 @@ export function LiquidColumns() {
       rects.current = Array.from(grid.children).map((el) =>
         el.getBoundingClientRect(),
       );
-      // The photograph is a share of the viewport width, so it moves on a resize too.
-      frameRect.current = null;
+      // The photograph is a share of the viewport width, so it moves on a resize too,
+      // and the gap between two of them is reckoned from the height of the window.
+      frameGeom.current = null;
       // Guarded: measure() also runs from a pointermove that missed, and that is no
       // place to be setting state on every event.
       const next = dockGeometry(window.innerWidth, window.innerHeight);
@@ -373,12 +388,34 @@ export function LiquidColumns() {
   const lens = (clientX: number, clientY: number) => {
     const frame = frameRef.current;
     if (!frame) return;
-    const box = (frameRect.current ??= frame.getBoundingClientRect());
+    ptr.current.x = clientX;
+    ptr.current.y = clientY;
+    if (!frameGeom.current) {
+      const box = frame.getBoundingClientRect();
+      frameGeom.current = {
+        box,
+        gap:
+          Math.max(IMAGE_REST_Y, window.innerHeight - IMAGE_REST_Y) +
+          FRAME_TAIL * box.height,
+      };
+    }
+    const { box, gap } = frameGeom.current;
     const x = clientX - box.left;
     const y = clientY - box.top;
     frame.style.setProperty("--lx", x + "px");
     frame.style.setProperty("--ly", y + "px");
-    const over = x >= 0 && x <= box.width && y >= 0 && y <= box.height;
+    // Not "inside the frame" — inside a picture. The frame is only where the strip
+    // rests; the pictures themselves are strung out from `--p` and slide through it,
+    // so between two of them there is nothing under the hand but white, and past the
+    // last one nothing at all. Whichever picture is over the pointer is the one being
+    // read, which is also what makes it work while the strip is mid-crossing.
+    const over =
+      x >= 0 &&
+      x <= box.width &&
+      EXPERIENCE.some((_, i) => {
+        const top = (i - at.current) * gap;
+        return y >= top && y <= top + box.height;
+      });
     if (over === overFrame.current) return;
     overFrame.current = over;
     setLensOn(over);
@@ -399,7 +436,7 @@ export function LiquidColumns() {
 
   /** Off the page, or the frame is about to move or go: forget where it was. */
   const dropLens = () => {
-    frameRect.current = null;
+    frameGeom.current = null;
     if (!overFrame.current) return;
     overFrame.current = false;
     setLensOn(false);
@@ -467,6 +504,11 @@ export function LiquidColumns() {
       if (lensTimer.current) clearTimeout(lensTimer.current);
     };
   }, []);
+
+  // Refreshed after every render so the loop above never holds an old one.
+  useEffect(() => {
+    probe.current = () => lens(ptr.current.x, ptr.current.y);
+  });
 
   // Columns are measured before the shutters move, so their rects stay valid while
   // one is open; nothing repositions, they only translate out of frame.
