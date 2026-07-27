@@ -88,14 +88,31 @@ const TEXT_BLANK = 0.05;
 const TEXT_SPAN = 0.11;
 
 /**
- * The staged reveal every piece of the open section shares: it rises into place
- * once the cube has parked, and leaves with no delay at all the moment the cube
- * sets off home — last in, first out.
+ * When the open section lands, counted from the click. The title, the entry and the
+ * photograph all arrive on this beat: they are one thing, and staggering them read
+ * as the page assembling itself in pieces.
+ */
+const ARRIVE_MS = SHUTTER_MS + 480;
+
+/** Leaving, for the parts that are mounted only while a section is open. */
+const exitFade = (closing: boolean) => ({
+  opacity: closing ? 0 : 1,
+  transition: "opacity 300ms linear",
+});
+
+/**
+ * The section title rising into place once the cube has parked, and leaving with no
+ * delay at all the moment it sets off home — last in, first out.
+ *
+ * Opacity carries the same curve as the transform, and as the `arrive` keyframe the
+ * entry and photograph use: on the default ease it reached full strength noticeably
+ * later than they did, and the three are meant to be one movement.
  */
 const reveal = (shown: boolean, delay: number) => ({
   opacity: shown ? 1 : 0,
   transform: shown ? "translateY(0)" : "translateY(14px)",
-  transition: "opacity 600ms, transform 600ms cubic-bezier(0.22, 1, 0.36, 1)",
+  transition:
+    "opacity 600ms cubic-bezier(0.22, 1, 0.36, 1), transform 600ms cubic-bezier(0.22, 1, 0.36, 1)",
   transitionDelay: shown ? `${SHUTTER_MS + delay}ms` : "0ms",
 });
 
@@ -378,8 +395,10 @@ export function LiquidColumns() {
     r.target.crystal = true;
     openedRef.current = hovered.current;
     setOpened(hovered.current);
-    // A section always opens on its first entry.
-    setEntry({ index: 0, from: 0 });
+    // A section always opens on its first entry. `from` of -1 is the arrival: it
+    // makes the counter roll its one notch onto 01 rather than sitting there
+    // already showing it, and it is what tells the reel to wait for the reveal.
+    setEntry({ index: 0, from: -1 });
     at.current = 0;
     want.current = 0;
     dir.current = 1;
@@ -494,6 +513,11 @@ export function LiquidColumns() {
                           // either way stays on it.
                           "--reel-from": 10 + was,
                           "--reel-to": 10 + was + step,
+                          // On the way in it waits for the title it sits on, or it
+                          // would turn over while still invisible. Afterwards it is
+                          // answering a gesture, so it is immediate.
+                          animationDelay:
+                            entry.from < 0 ? `${ARRIVE_MS}ms` : "0ms",
                         } as React.CSSProperties
                       }
                     >
@@ -519,7 +543,11 @@ export function LiquidColumns() {
           // change from one experience to the next. They cannot share an element: a
           // CSS animation with fill-mode `both` holds its last frame and would win
           // over the inline opacity the exit needs.
-          <div className="mt-12 sm:mt-16" style={reveal(settled, 620)}>
+          // Three levels, one job each: leaving, arriving, and the scroll fade.
+          // They cannot share an element — an animation holding its last frame
+          // would win over the opacity the other two need.
+          <div className="mt-12 sm:mt-16" style={exitFade(closing)}>
+            <div className="arrive" style={{ animationDelay: `${ARRIVE_MS}ms` }}>
             {/* Faded straight off the scroll position, so it thins out as the list
                 is dragged and is already gone at the halfway point where the
                 wording swaps. */}
@@ -540,6 +568,7 @@ export function LiquidColumns() {
                 {shown.summary}
               </p>
             </article>
+            </div>
           </div>
         )}
       </div>
@@ -556,14 +585,17 @@ export function LiquidColumns() {
           but only from `lg` up: at the narrow end of `sm` the measure and the image
           already almost touch, and moving it left there would land it on the words. */}
       {opened !== null && COLUMNS[opened] === "Experience" && (
-        <div className="pointer-events-none absolute right-10 top-1/2 hidden -translate-y-1/2 sm:block lg:right-40">
+        <div
+          className="pointer-events-none absolute right-10 top-1/2 hidden -translate-y-1/2 sm:block lg:right-40"
+          style={exitFade(closing)}
+        >
           {/* Two things about this wrapper: the reveal owns `transform` for its rise,
               so the centring translate has to live on the parent rather than fight it
               here; and the frame is 1.85:1 while the source is 3:2, so `fill` plus
               object-cover crops the top and bottom instead of squashing. */}
           <div
-            className="relative aspect-[1.85/1] w-[34vw] max-w-[560px]"
-            style={reveal(settled, 560)}
+            className="arrive relative aspect-[1.85/1] w-[34vw] max-w-[560px]"
+            style={{ animationDelay: `${ARRIVE_MS}ms` }}
           >
             {/* Every entry is laid out from the same position, a screen apart.
                 Nothing is keyed or replayed: drag the position and the whole strip
