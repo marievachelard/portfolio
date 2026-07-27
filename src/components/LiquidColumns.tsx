@@ -70,14 +70,17 @@ const SCROLL_PER_ENTRY = 500;
  */
 const SCROLL_SMOOTH = 0.0009;
 /**
- * How far the list can move off an entry before the text starts to go, as a
- * fraction of the gap. Below it the wording simply stays: the picture is still
- * around the height of the text, so the two belong together. Past it the text
- * clears out, and it is fully gone at the halfway mark where the wording swaps —
- * which is the only place it can swap without one line replacing another in plain
- * sight.
+ * When the text changes hands, measured as how far the arriving picture still has
+ * to travel before it is home — in gaps, so 0.16 means a sixth of a screen short of
+ * the frame. The wording belongs to its entry for the whole crossing and only hands
+ * over as the next picture lands at the height it will rest at.
+ *
+ * TEXT_SPAN is how much travel the fade takes on either side of that point, and is
+ * the smaller of the two on purpose: the text is fully back by the time the picture
+ * has settled, and fully gone before the swap.
  */
-const TEXT_HOLD = 0.32;
+const TEXT_SWAP = 0.16;
+const TEXT_SPAN = 0.13;
 
 /**
  * The staged reveal every piece of the open section shares: it rises into place
@@ -124,6 +127,8 @@ export function LiquidColumns() {
   const at = useRef(0);
   const want = useRef(0);
   const rafId = useRef(0);
+  /** Which way the list was last asked to go; the arriving picture depends on it. */
+  const dir = useRef(1);
 
   // Wheel-dragged, not wheel-triggered. The deltas move a continuous position, the
   // position chases it with an ease, and everything is placed from it — so the
@@ -142,14 +147,28 @@ export function LiquidColumns() {
       if (!el) return;
       const p = at.current;
       el.style.setProperty("--p", p.toFixed(4));
-      // The text holds while its picture is near home and only clears out over the
-      // last stretch before the swap.
-      const off = Math.abs(p - Math.round(p));
-      const fade = Math.min(1, Math.max(0, (0.5 - off) / (0.5 - TEXT_HOLD)));
-      el.style.setProperty("--fade", fade.toFixed(3));
-      const near = Math.round(p);
+      // Which picture is arriving depends on which way the list is going, and how
+      // far it still has to travel is what the text answers to — not the distance
+      // to the nearest entry, which would have it fading the moment anything moved.
+      const forward = dir.current >= 0;
+      const frac = p - Math.floor(p);
+      const arriving = forward ? 1 - frac : frac;
+      el.style.setProperty(
+        "--fade",
+        Math.min(1, Math.abs(arriving - TEXT_SWAP) / TEXT_SPAN).toFixed(3),
+      );
+      // The counter turns with the wording rather than at the midpoint: they name
+      // the same thing, and they would disagree for a whole stretch otherwise.
+      const reached = arriving < TEXT_SWAP;
+      const idx = Math.min(
+        last,
+        Math.max(
+          0,
+          reached === forward ? Math.ceil(p) : Math.floor(p),
+        ),
+      );
       setEntry((was) =>
-        was.index === near ? was : { index: near, from: was.index },
+        was.index === idx ? was : { index: idx, from: was.index },
       );
     };
 
@@ -177,6 +196,7 @@ export function LiquidColumns() {
     const onWheel = (e: WheelEvent) => {
       // Clamped rather than wrapped: dragging a list has two ends, and being
       // thrown back to the start mid-gesture is not a thing a list does.
+      if (e.deltaY !== 0) dir.current = Math.sign(e.deltaY);
       want.current = Math.min(
         last,
         Math.max(0, want.current + e.deltaY / SCROLL_PER_ENTRY),
@@ -192,6 +212,7 @@ export function LiquidColumns() {
             ? -1
             : 0;
       if (!step) return;
+      dir.current = step;
       want.current = Math.min(last, Math.max(0, Math.round(want.current) + step));
       run();
     };
@@ -355,6 +376,7 @@ export function LiquidColumns() {
     setEntry({ index: 0, from: 0 });
     at.current = 0;
     want.current = 0;
+    dir.current = 1;
     r.wake();
     if (stageTimer.current) clearTimeout(stageTimer.current);
     stageTimer.current = setTimeout(() => {
