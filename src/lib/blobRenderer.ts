@@ -78,11 +78,11 @@ const DOCK_INSET = 104;
 const MAX_DPR = 1.4;
 
 /**
- * Seconds to drain the body out of the column being left. Linear rather than
- * eased so the hand-off has a definite end: the body only re-forms in the new
- * column once this has run out, and an asymptote never gets there.
+ * Seconds the change of column is softened over. Short on purpose: the change is
+ * still meant to read as a cut, this only takes the hard edge off both sides of
+ * it — long enough not to sting, too short to be a transition of its own.
  */
-const FADE_OUT = 0.15;
+const HANDOFF = 0.1;
 
 function compile(gl: WebGL2RenderingContext, type: number, src: string) {
   const sh = gl.createShader(type)!;
@@ -123,6 +123,7 @@ export function createBlobRenderer(canvas: HTMLCanvasElement): BlobRenderer | nu
     half: gl.getUniformLocation(program, "uHalf"),
     cubeHalf: gl.getUniformLocation(program, "uCubeHalf"),
     amount: gl.getUniformLocation(program, "uAmount"),
+    fade: gl.getUniformLocation(program, "uFade"),
     cube: gl.getUniformLocation(program, "uCube"),
     flow: gl.getUniformLocation(program, "uFlow"),
     slosh: gl.getUniformLocation(program, "uSlosh"),
@@ -144,14 +145,41 @@ export function createBlobRenderer(canvas: HTMLCanvasElement): BlobRenderer | nu
     pointerY: 0,
   };
 
-  // Eased state. `x`/`y` are CSS px. The body never travels between columns: it
-  // drains out of the one being left and re-forms in place in the next, so `x` is
-  // only ever repositioned while nothing is on screen to see it move.
+  // Eased state. `x`/`y` are CSS px. There is one body and it changes column in a
+  // single frame — it never travels. `amount` is its presence in the grid (hover in
+  // and out) and is left untouched by a change of column.
   const eased = { x: 0, y: 0, width: 0, height: 0, amount: 0, cube: 0, unit: 0 };
   // Clip window, CSS px. Both edges are only ever set to a column boundary — never
   // interpolated — so the cut never lands mid-column, and the body is always
   // contained by exactly the column it lives in.
   const clip = { left: 0, right: 0 };
+  /**
+   * How much of the newly arrived body is still held back, 1 → 0 over HANDOFF. It
+   * goes to the shader as `uFade`, which touches opacity only: routing it through
+   * `amount` would scale the body as well, and a shape popping up to size is the
+   * opposite of taking the edge off.
+   */
+  let handoff = 0;
+  /**
+   * Snapshots of columns just left, frozen where they stood and drawn as extra
+   * passes while their own `fade` runs out. Each carries its own progress because a
+   * flick can leave a column before the one before it has finished, and sharing one
+   * would snap that one off at whatever opacity it had reached.
+   */
+  const leaving: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    unit: number;
+    cube: number;
+    amount: number;
+    clipL: number;
+    clipR: number;
+    fade: number;
+  }[] = [];
+  /** Only reachable by flicking across columns; the oldest is also the faintest. */
+  const MAX_LEAVING = 3;
   let flow = 0;
   let slosh = 0;
   let prev = { x: 0, y: 0 };
@@ -214,12 +242,6 @@ export function createBlobRenderer(canvas: HTMLCanvasElement): BlobRenderer | nu
       seeded = true;
     }
 
-    // Set while the body still has to clear the column it is leaving. Held for a
-    // frame at a time rather than kept as state: the test is simply "is what is on
-    // screen somewhere other than where the pointer is", so backtracking to the
-    // original column mid-drain cancels the hand-off on its own.
-    let draining = false;
-
     if (target.docked) {
       // Leaving the grid: fly to the corner while shrinking. The clip opens to the
       // whole viewport, since there is no column left to be contained by.
@@ -231,18 +253,32 @@ export function createBlobRenderer(canvas: HTMLCanvasElement): BlobRenderer | nu
       // Half a column is the widest the geometry can drift under a resize and the
       // narrowest a real column change can be, so it separates the two cleanly.
       if (Math.abs(eased.x - target.colCenterX) > wantW * 0.5) {
-        if (eased.amount < 0.02) {
-          // Nothing left on screen: reposition outright. Easing across is exactly
-          // the travel this is meant to avoid.
-          eased.x = target.colCenterX;
-          eased.y = target.colCenterY;
-          eased.width = wantW;
-          eased.height = wantH;
-          clip.left = target.colCenterX - wantW / 2;
-          clip.right = target.colCenterX + wantW / 2;
-        } else {
-          draining = true;
+        // The change of column is a cut, not a move: everything positional is
+        // rewritten in this one frame. The only thing that is not instant is the
+        // brief fade on either side of it — the column being left keeps its own
+        // copy to go out on, and the new one is held back by `handoff`.
+        if (eased.amount > 0.004) {
+          leaving.push({
+            x: eased.x,
+            y: eased.y,
+            width: eased.width,
+            height: eased.height,
+            unit: eased.unit,
+            cube: eased.cube,
+            amount: eased.amount,
+            clipL: clip.left,
+            clipR: clip.right,
+            fade: 1,
+          });
+          if (leaving.length > MAX_LEAVING) leaving.shift();
         }
+        handoff = 1;
+        eased.x = target.colCenterX;
+        eased.y = target.colCenterY;
+        eased.width = wantW;
+        eased.height = wantH;
+        clip.left = target.colCenterX - wantW / 2;
+        clip.right = target.colCenterX + wantW / 2;
       } else {
         // Same column — this only ever absorbs layout drift from a resize.
         eased.x = ease(eased.x, target.colCenterX, 0.0006, dt);
@@ -254,10 +290,17 @@ export function createBlobRenderer(canvas: HTMLCanvasElement): BlobRenderer | nu
       }
     }
     eased.unit = ease(eased.unit, wantUnit, 0.0009, dt);
-    eased.amount = draining
-      ? Math.max(0, eased.amount - dt / FADE_OUT)
-      : ease(eased.amount, target.active ? 1 : 0, 0.0009, dt);
+    eased.amount = ease(eased.amount, target.active ? 1 : 0, 0.0009, dt);
     eased.cube = ease(eased.cube, target.crystal ? 1 : 0, 0.0022, dt);
+
+    // Linear, so both halves of the hand-off actually finish — an easing asymptote
+    // would leave a permanent sliver of the old column on screen.
+    const step = dt / HANDOFF;
+    handoff = Math.max(0, handoff - step);
+    for (let i = leaving.length - 1; i >= 0; i--) {
+      leaving[i].fade -= step;
+      if (leaving[i].fade <= 0.004) leaving.splice(i, 1);
+    }
 
     // Pointer velocity feeds the slosh: fast attack, slow settle.
     const dx = target.pointerX - prev.x;
@@ -269,7 +312,7 @@ export function createBlobRenderer(canvas: HTMLCanvasElement): BlobRenderer | nu
     // Advance a continuous phase — modulating time * speed would jump the noise.
     flow += dt * (reduced ? 0 : 0.55 + slosh * 1.6);
 
-    if (eased.amount < 0.005 && !target.active) {
+    if (eased.amount < 0.005 && leaving.length === 0 && !target.active) {
       gl.clear(gl.COLOR_BUFFER_BIT);
       // Nothing to draw and nothing incoming: park the loop until wake().
       if ((idle += dt) > 0.75) {
@@ -281,34 +324,71 @@ export function createBlobRenderer(canvas: HTMLCanvasElement): BlobRenderer | nu
     }
     idle = 0;
 
-    // In the grid one world unit is half a column, so the pillar's height in world
-    // units is just the column's aspect ratio. Docked, the unit shrinks instead and
-    // the pillar extent no longer matters — the body is a cube by then.
-    const unit = eased.unit || eased.width / 2;
-    const halfY = Math.max(
-      ((eased.height / 2) / (eased.width / 2)) * OVERFLOW_Y,
-      CUBE_HALF,
-    );
-
     gl.clear(gl.COLOR_BUFFER_BIT);
     gl.uniform2f(u.res, canvas.width, canvas.height);
-    // gl_FragCoord has its origin bottom-left, CSS coordinates top-left.
-    gl.uniform2f(u.center, eased.x * dpr, (cssH - eased.y) * dpr);
-    gl.uniform1f(u.unit, unit * dpr);
-    gl.uniform2f(u.clip, clip.left * dpr, clip.right * dpr);
-    gl.uniform3f(u.half, HALF_X, halfY, HALF_Z);
     gl.uniform1f(u.cubeHalf, CUBE_HALF);
-    gl.uniform1f(u.amount, eased.amount);
-    gl.uniform1f(u.cube, eased.cube);
     gl.uniform1f(u.flow, flow);
     gl.uniform1f(u.slosh, slosh);
-    // Docked, the pointer is somewhere else entirely on the page — letting it aim
-    // the bulge from that far away just makes the cube lurch.
-    gl.uniform2f(
-      u.aim,
+
+    // No two bodies share a column, so the clip windows never overlap and straight
+    // alpha blending is enough to draw them one after the other.
+    for (const body of leaving) {
+      // Aim is dropped: the pointer is a column away by now, and letting the body
+      // on its way out lean after it is the sideways pull this is meant to be
+      // rid of.
+      drawBody(body, body.amount, body.fade, body.cube, body.clipL, body.clipR, 0, 0);
+    }
+
+    const unit = eased.unit || eased.width / 2;
+    drawBody(
+      eased,
+      eased.amount,
+      1 - handoff,
+      eased.cube,
+      clip.left,
+      clip.right,
+      // Docked, the pointer is somewhere else entirely on the page — letting it aim
+      // the bulge from that far away just makes the cube lurch.
       target.docked ? 0 : (target.pointerX - eased.x) / unit,
       target.docked ? 0 : -(target.pointerY - eased.y) / unit,
     );
+  }
+
+  /**
+   * One raymarch pass for one body. Everything that differs between the column
+   * being left and the current one is a parameter; the frame-wide uniforms
+   * (resolution, flow, slosh) are already set by the caller.
+   */
+  function drawBody(
+    body: { x: number; y: number; width: number; height: number; unit: number },
+    amount: number,
+    fade: number,
+    cube: number,
+    clipL: number,
+    clipR: number,
+    aimX: number,
+    aimY: number,
+  ) {
+    if (amount < 0.004 || fade < 0.004) return;
+
+    // In the grid one world unit is half a column, so the pillar's height in world
+    // units is just the column's aspect ratio. Docked, the unit shrinks instead and
+    // the pillar extent no longer matters — the body is a cube by then.
+    const unit = body.unit || body.width / 2;
+    const halfY = Math.max(
+      ((body.height / 2) / (body.width / 2)) * OVERFLOW_Y,
+      CUBE_HALF,
+    );
+
+    // gl_FragCoord has its origin bottom-left, CSS coordinates top-left.
+    gl.uniform2f(u.center, body.x * dpr, (cssH - body.y) * dpr);
+    gl.uniform1f(u.unit, unit * dpr);
+    gl.uniform2f(u.clip, clipL * dpr, clipR * dpr);
+    gl.uniform3f(u.half, HALF_X, halfY, HALF_Z);
+    gl.uniform1f(u.amount, amount);
+    gl.uniform1f(u.fade, fade);
+    gl.uniform1f(u.cube, cube);
+    gl.uniform2f(u.aim, aimX, aimY);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   }
 

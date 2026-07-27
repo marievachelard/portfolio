@@ -32,6 +32,7 @@ uniform vec2  uClip;     // left / right clip edges, device px — always on a c
 uniform vec3  uHalf;     // half extents of the liquid pillar, world units
 uniform float uCubeHalf; // half edge of the crystallised cube, world units
 uniform float uAmount;   // 0..1 presence (hover in / out), scales the whole body
+uniform float uFade;     // 0..1 opacity only — softens the cut between columns without resizing
 uniform float uCube;     // 0 = liquid pillar, 1 = crystallised cube
 uniform float uFlow;     // continuous animation phase (never time * speed)
 uniform float uSlosh;    // 0..1 energy from pointer velocity
@@ -234,7 +235,7 @@ void main(){
   // on a column boundary, so a body in transit is cut by the grid itself.
   float gate = smoothstep(uClip.x, uClip.x + 1.0, gl_FragCoord.x)
              * (1.0 - smoothstep(uClip.y - 1.0, uClip.y, gl_FragCoord.x));
-  if (uAmount < 0.004 || gate < 0.002) discard;
+  if (uAmount < 0.004 || uFade < 0.004 || gate < 0.002) discard;
 
   vec2 o = uv / (1.0 + PERSP * CAMZ);
   vec3 ro = vec3(o, -CAMZ);
@@ -314,6 +315,6 @@ void main(){
   alpha += spec * 0.55;
   alpha *= mix(1.0, 1.12, uCube);            // the cube sits a touch more solid
 
-  fragColor = vec4(clamp(col, 0.0, 1.0), clamp(alpha, 0.0, 1.0) * uAmount * gate);
+  fragColor = vec4(clamp(col, 0.0, 1.0), clamp(alpha, 0.0, 1.0) * uAmount * uFade * gate);
 }
 `;
