@@ -75,12 +75,17 @@ const SCROLL_SMOOTH = 0.0009;
  * the frame. The wording belongs to its entry for the whole crossing and only hands
  * over as the next picture lands at the height it will rest at.
  *
- * TEXT_SPAN is how much travel the fade takes on either side of that point, and is
- * the smaller of the two on purpose: the text is fully back by the time the picture
- * has settled, and fully gone before the swap.
+ * TEXT_BLANK is a hold either side of that point where the text is fully gone, so
+ * the change is marked rather than instantaneous; TEXT_SPAN is the fade on each
+ * side of the hold.
+ *
+ * The two together cannot exceed TEXT_SWAP: past that the text would still be on
+ * its way back when the picture has already settled, and would never reach full
+ * strength at rest.
  */
 const TEXT_SWAP = 0.16;
-const TEXT_SPAN = 0.13;
+const TEXT_BLANK = 0.05;
+const TEXT_SPAN = 0.11;
 
 /**
  * The staged reveal every piece of the open section shares: it rises into place
@@ -153,9 +158,10 @@ export function LiquidColumns() {
       const forward = dir.current >= 0;
       const frac = p - Math.floor(p);
       const arriving = forward ? 1 - frac : frac;
+      const off = Math.abs(arriving - TEXT_SWAP);
       el.style.setProperty(
         "--fade",
-        Math.min(1, Math.abs(arriving - TEXT_SWAP) / TEXT_SPAN).toFixed(3),
+        Math.min(1, Math.max(0, (off - TEXT_BLANK) / TEXT_SPAN)).toFixed(3),
       );
       // The counter turns with the wording rather than at the midpoint: they name
       // the same thing, and they would disagree for a whole stretch otherwise.
