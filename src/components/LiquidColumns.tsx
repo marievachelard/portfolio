@@ -168,6 +168,28 @@ const PHRASE: Record<string, string> = {
 };
 
 /**
+ * Contact: a line saying how to reach her, and the three places to do it from.
+ *
+ * The three are the same marks the projects and the jobs link out with — one row, one set
+ * of type, the same spread under the pointer. Nothing here is a form or a button, because
+ * nothing else on this page is either.
+ *
+ * The address is behind [ Email ] rather than spelled out. That is the one thing this
+ * arrangement costs: it can be clicked but not read, so anyone who would rather copy it
+ * than open a mail client has to open one first. Worth revisiting if that turns out to
+ * matter more than the row staying three even marks.
+ */
+const CONTACT = {
+  prose:
+    "Email is the surest way to reach me, and I answer. Happy to talk data teams, side projects, or where to run in Toulouse.",
+  links: [
+    { label: "Email", href: "mailto:marie.vachelard-pro@proton.me" },
+    { label: "LinkedIn", href: "https://www.linkedin.com/in/marie-vachelard/" },
+    { label: "GitHub", href: "https://github.com/marievachelard" },
+  ],
+};
+
+/**
  * About's two blocks of prose. Placeholder, and written to say so: it is here to hold
  * the shape of the arrangement — two columns either side of the portrait — until there
  * are true words to put in it. Both run four to five lines at the measure below, which
@@ -357,6 +379,11 @@ const PROSE = "text-sm leading-relaxed text-neutral-600 sm:text-base";
  * is laid over the grid, which is what listens for the click that opens a column. And
  * `tabIndex`, because that overlay goes aria-hidden while a section closes, and a
  * focusable node inside a hidden subtree is a fault rather than a nicety.
+ *
+ * A mailto is the one kind that does not open a tab. It hands the reader to their mail
+ * client instead of to a page, and `_blank` on that leaves an empty tab sitting behind
+ * once the handoff has happened. Read off the href rather than passed in, since it is a
+ * property of the destination and not a decision any call site should have to make.
  */
 const mark = ({
   href,
@@ -369,12 +396,14 @@ const mark = ({
   settled: boolean;
   /** Placed on the middle of the page rather than flush to its left margin. */
   centred?: boolean;
-}) => (
+}) => {
+  const opensAPage = !href.startsWith("mailto:");
+  return (
   <a
     key={href}
     href={href}
-    target="_blank"
-    rel="noreferrer"
+    target={opensAPage ? "_blank" : undefined}
+    rel={opensAPage ? "noreferrer" : undefined}
     tabIndex={settled ? undefined : -1}
     className={`mark${
       centred ? " mark-mid" : ""
@@ -385,7 +414,8 @@ const mark = ({
     </span>
     <span className="mark-label">[ {label} ]</span>
   </a>
-);
+  );
+};
 
 export function LiquidColumns() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -1083,6 +1113,37 @@ export function LiquidColumns() {
                   settled,
                   centred: true,
                 })}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Contact: a line of prose and the three ways to reach her.
+
+            The same box as an Experience entry's — the same parent, the same
+            `mt-12 sm:mt-16`, the same reserved height — and the same empty name and dates
+            reserved above the prose that About reserves. That is what puts this section's
+            first line on the line the other three start on, so nothing shifts vertically
+            as you move between them. It is the only reason `leading(null)` is here: there
+            is no name and no date to show, only a height to hold.
+
+            48 characters, the measure an Experience summary reads at. No `44vw` clamp on
+            it though — that exists to keep a long line out of the photograph on the right,
+            and this is the one section with nothing over there.
+
+            The row of marks is the projects' row: same `mt-8`, same `gap-6`, same type. */}
+        {opened !== null && COLUMNS[opened] === "Contact" && (
+          <div className="mt-12 sm:mt-16" style={{ minHeight: BLOCK_H }}>
+            <div
+              className={closing ? "depart" : "arrive"}
+              style={{ animationDelay: closing ? "0ms" : `${restAt}ms` }}
+            >
+              {leading(null)}
+              <p className={`mt-8 max-w-[48ch] sm:mt-10 ${PROSE}`}>
+                {CONTACT.prose}
+              </p>
+              <p className="mt-8 flex gap-6">
+                {CONTACT.links.map((link) => mark({ ...link, settled }))}
               </p>
             </div>
           </div>
