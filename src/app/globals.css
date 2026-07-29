@@ -39,9 +39,13 @@ body {
     auto;
 }
 
-/* Tailwind's preflight gives buttons their own `cursor: default`, which swaps the dot
-   back out for an arrow over the only interactive thing on the page. */
-button {
+/* Tailwind's preflight gives buttons their own `cursor: default`, and an anchor gets
+   `cursor: pointer` from the browser — either swaps the dot back out over the few
+   interactive things on the page, which reads as the custom cursor breaking rather than
+   as a hint. What a project's links are is said by their brackets and by the ink they
+   take on hover. */
+button,
+a {
   cursor: inherit;
 }
 

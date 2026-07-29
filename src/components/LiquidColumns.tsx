@@ -12,11 +12,33 @@ import {
 import clouds from "@/images/experience/viktor-mogilat-jYbBn4m3sW0-unsplash.jpg";
 import blooms from "@/images/experience/roma-kaiuk-KgEteyimvHs-unsplash.jpg";
 import portrait from "@/images/about/marie-vachelard.jpg";
+// The projects' photographs are Marie's own, so there is no attribution to carry in
+// the filename — they are named for what is in them.
+import marathon from "@/images/projects/strava-paris-marathon.jpg";
+import figurines from "@/images/projects/hackaviz-toulouse.jpg";
 
 const COLUMNS = ["About", "Experience", "Projects", "Contact"];
 
 /** How long the shutters take to clear the frame before the cube is released. */
 const SHUTTER_MS = 650;
+
+/**
+ * One item of a list a section can be scrolled through. Two sections have such a list —
+ * Experience and Projects — and they are the same thing to everything below: the same
+ * drag, the same counter, the same strip of photographs, the same fade when the entry
+ * changes. The only difference between them is the data.
+ *
+ * `links` is what a project has and a job does not, so it is optional rather than a
+ * second shape: an entry without it simply renders no row of links.
+ */
+type Entry = {
+  title: string;
+  dates: string;
+  summary: string;
+  image: typeof clouds;
+  imageAlt: string;
+  links?: { label: string; href: string }[];
+};
 
 /**
  * Experience entries, newest first. Adding one is one more item here. All of it is
@@ -32,7 +54,7 @@ const SHUTTER_MS = 650;
  * the text is clipped — the page does not scroll, so what does not fit is lost rather
  * than reachable. An eighth line costs another 26px of that headroom.
  */
-const EXPERIENCE = [
+const EXPERIENCE: Entry[] = [
   {
     title: "Pictarine",
     /** Digits and an en dash, tabular so a column of them lines up. */
@@ -68,6 +90,60 @@ const EXPERIENCE = [
     imageAlt: "Massif de fleurs saisi en filé, rouges et blancs sur vert",
   },
 ];
+
+/**
+ * Projects, newest first like the experiences. Everything an experience has, plus the
+ * two places a project can be gone to: the thing itself, and the repository it was
+ * built in.
+ *
+ * The summaries are shorter than an experience's, and by five lines rather than seven.
+ * A project spends the other two lines on its row of links: BLOCK_H is shared with
+ * Experience — it has to be, or the photograph would rest at a different height in each
+ * section — and mt-8 plus a line of mono is 48px of the 182 that block reserves for
+ * prose. Five lines is about 350 characters at this measure.
+ */
+const PROJECTS: Entry[] = [
+  {
+    title: "Hackaviz Toulouse",
+    dates: "2026",
+    summary:
+      "Four of us turned the Hackaviz brief — public spending and well-being — into a scrolling story: two women born the same year, one Greek, one Portuguese, whose governments answered the 2008 crisis in opposite ways. It was also the first thing any of us built with Claude Code.",
+    image: figurines,
+    imageAlt:
+      "Quatre figurines de bronze assises sur une poutre, une silhouette floue derrière",
+    links: [
+      { label: "Visit", href: "https://marievachelard.github.io/hackaviz_2026/" },
+      { label: "GitHub", href: "https://github.com/marievachelard/hackaviz_2026" },
+    ],
+  },
+  {
+    title: "Strava Activity Tracker",
+    dates: "2025",
+    summary:
+      "I wanted my own running data back out of Strava's app, so I built a Streamlit dashboard on top of its API: distance, pace, and the shape of a training block over time. It started as an excuse to learn the API properly and turned into the thing I actually open after a long run.",
+    image: marathon,
+    imageAlt:
+      "Coureurs du marathon de Paris sur les pavés, l'Arc de Triomphe au fond",
+    links: [
+      { label: "Visit", href: "https://strava-activity-tracker.streamlit.app/" },
+      {
+        label: "GitHub",
+        href: "https://github.com/marievachelard/strava_streamlit_app",
+      },
+    ],
+  },
+];
+
+/**
+ * The sections that are a list, by name. This is the whole of what makes Projects work:
+ * the drag, the counter, the strip and the fade all ask this rather than naming a
+ * section, so a section either has entries or it does not. Contact has none, About has
+ * its own arrangement, and adding a third list is one more line here.
+ */
+const ENTRIES: Record<string, Entry[]> = {
+  Experience: EXPERIENCE,
+  Projects: PROJECTS,
+};
 
 /**
  * About's two blocks of prose. Placeholder, and written to say so: it is here to hold
@@ -253,6 +329,15 @@ export function LiquidColumns() {
   const [textIndex, setTextIndex] = useState(0);
   const mainRef = useRef<HTMLElement>(null);
 
+  /**
+   * The open section's entries, or null if it has none. Everything that used to name
+   * Experience asks this instead, which is what Projects rides in on.
+   *
+   * Referentially stable for a given `opened` — it is a lookup into a module constant,
+   * not a fresh array — so it is safe as an effect dependency in place of `opened`.
+   */
+  const entries = opened === null ? null : (ENTRIES[COLUMNS[opened]] ?? null);
+
   /** Where the list actually is, and where the wheel has asked it to go. */
   const at = useRef(0);
   const want = useRef(0);
@@ -278,8 +363,8 @@ export function LiquidColumns() {
   // whichever entry it picks and however softly it moves — it is movement nobody asked
   // for, and this page is meant to feel dragged rather than operated.
   useEffect(() => {
-    if (opened === null || COLUMNS[opened] !== "Experience") return;
-    const last = EXPERIENCE.length - 1;
+    if (!entries) return;
+    const last = entries.length - 1;
     let prev = 0;
 
     const paint = () => {
@@ -366,7 +451,7 @@ export function LiquidColumns() {
       if (rafId.current) cancelAnimationFrame(rafId.current);
       rafId.current = 0;
     };
-  }, [opened]);
+  }, [entries]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -565,12 +650,12 @@ export function LiquidColumns() {
   const typedAt = TYPE_START + Math.max(0, label.length - 1) * TYPE_STEP;
   const restAt = typedAt + REST_GAP;
 
-  /** The aside on the title's own baseline. Experience says which entry of how many;
+  /** The aside on the title's own baseline. A list says which entry of how many;
       About introduces the person whose page this is. Two different sentences, but the
       same mark in the same place — so they are one element with one set of type, and a
       section without an aside simply has none. */
   const aside =
-    opened === null ? null : COLUMNS[opened] === "Experience" ? (
+    opened === null ? null : entries ? (
       <>
         [{" "}
         {/* Turning over rather than fading: the number has its own way of
@@ -595,7 +680,7 @@ export function LiquidColumns() {
             </span>
           ))}
         </span>{" "}
-        / {pad(EXPERIENCE.length)} ]
+        / {pad(entries.length)} ]
       </>
     ) : COLUMNS[opened] === "About" ? (
       // A string rather than JSX text: the apostrophe stays a plain one that way,
@@ -605,8 +690,8 @@ export function LiquidColumns() {
 
   /** The strip of photographs, laid out from `--p`. The alt text belongs to the picture
       that is actually being shown, so only that one carries it. */
-  const strip = () =>
-    EXPERIENCE.map((item, i) => (
+  const strip = (items: Entry[]) =>
+    items.map((item, i) => (
       <div key={i} className="frame-layer" style={{ "--i": i } as React.CSSProperties}>
         <Image
           src={item.image}
@@ -619,7 +704,15 @@ export function LiquidColumns() {
       </div>
     ));
 
-  const shown = EXPERIENCE[textIndex];
+  /**
+   * The entry the words are on, which trails the one the pictures are on by a fade.
+   *
+   * Clamped rather than indexed straight. `textIndex` outlives the section that set it —
+   * it is reset in `open()`, batched with `opened`, so no render should ever see it point
+   * past the shorter list — but the lists are no longer the same length, and the cost of
+   * being wrong about that is reading `.summary` off nothing.
+   */
+  const shown = entries?.[Math.min(textIndex, entries.length - 1)];
   /** The wording has caught up with the change, so it belongs on screen. */
   const textSettled = textIndex === entry.index;
 
@@ -740,7 +833,7 @@ export function LiquidColumns() {
             title's left edge by sitting inside it, so nothing can drift out of
             alignment on its own. Each entry arrives a beat after the title, and
             its own three parts a beat after each other. */}
-        {opened !== null && COLUMNS[opened] === "Experience" && (
+        {entries && shown && (
           // Two nested mechanisms, on purpose. The outer element owns the section
           // opening and closing; the inner one, re-keyed on the entry, owns the
           // change from one experience to the next. They cannot share an element: a
@@ -774,6 +867,37 @@ export function LiquidColumns() {
               <p className={`mt-8 max-w-[min(48ch,44vw)] sm:mt-10 ${PROSE}`}>
                 {shown.summary}
               </p>
+
+              {/* Where a project can be gone to. Inside the article, so it fades with
+                  the wording rather than on its own — which is also what hides the row
+                  moving up or down a line when one entry's summary is shorter than the
+                  next one's: the reflow happens at opacity 0.
+
+                  The type is the dates' and the counter's and [ CLOSE ]'s, brackets and
+                  all: this page annotates in mono at 10px, and a link is an annotation
+                  here rather than a button.
+
+                  pointer-events, because the whole block sits in a container that has
+                  none — it is an overlay over the grid, which is what listens for the
+                  click that opens a column. And tabIndex, because that same container
+                  goes aria-hidden while the section closes, and a focusable node inside
+                  a hidden subtree is a fault rather than a nicety. */}
+              {shown.links && (
+                <p className="mt-8 flex gap-6 font-mono text-[10px] tracking-[0.2em] text-neutral-400 sm:text-xs">
+                  {shown.links.map((link) => (
+                    <a
+                      key={link.href}
+                      href={link.href}
+                      target="_blank"
+                      rel="noreferrer"
+                      tabIndex={settled ? undefined : -1}
+                      className="pointer-events-auto whitespace-nowrap transition-colors duration-200 hover:text-neutral-900"
+                    >
+                      [ {link.label} ↗ ]
+                    </a>
+                  ))}
+                </p>
+              )}
             </article>
             </div>
           </div>
@@ -866,7 +990,7 @@ export function LiquidColumns() {
           Pulled in from the right edge so it sits nearer the text than the frame,
           but only from `lg` up: at the narrow end of `sm` the measure and the image
           already almost touch, and moving it left there would land it on the words. */}
-      {opened !== null && COLUMNS[opened] === "Experience" && (
+      {entries && (
         <div
           className="pointer-events-none absolute right-10 hidden -translate-y-1/2 sm:block lg:right-40"
           // Its resting height, and the same figure handed to the CSS: the spacing
@@ -888,7 +1012,7 @@ export function LiquidColumns() {
                 Nothing is keyed or replayed: drag the position and the whole strip
                 moves with it. The frame does not clip them — only the page does —
                 so a picture is visible for the whole of its crossing. */}
-            {strip()}
+            {strip(entries)}
           </div>
         </div>
       )}
