@@ -50,9 +50,14 @@ type Entry = {
  * seventy characters. None of these exceeds seven lines.
  *
  * The ceiling is the window, not the measure. The vertical offsets are fixed, so seven
- * lines end at 594px whatever the height of the window, and below that much viewport
- * the text is clipped — the page does not scroll, so what does not fit is lost rather
- * than reachable. An eighth line costs another 26px of that headroom.
+ * lines end at 594px whatever the height of the window, and the row of links under them
+ * ends at 638 — below that much viewport it is clipped, and the page does not scroll, so
+ * what does not fit is lost rather than reachable. An eighth line costs another 26px of
+ * that headroom, and it is now a link rather than the tail of a sentence that goes over
+ * the edge first.
+ *
+ * Each entry links to the company it names. One mark, not the projects' two: there is no
+ * repository behind a job.
  */
 const EXPERIENCE: Entry[] = [
   {
@@ -64,6 +69,7 @@ const EXPERIENCE: Entry[] = [
     image: clouds,
     /** Describes the frame, since nothing in the text does it. */
     imageAlt: "Ciel d'été, gros cumulus, grain de pellicule",
+    links: [{ label: "Visit", href: "https://pictarine.com/en" }],
   },
   {
     title: "Capgemini",
@@ -72,6 +78,7 @@ const EXPERIENCE: Entry[] = [
       "Four years, five countries, and a lot of very different projects. I worked on-site in Hamburg, Madrid, Cadiz, Singapore and Paris, on everything from aircraft quality control at Airbus to unsupervised learning on cybersecurity threats. Some missions I led solo, others with a team, always with a client in the room and a business question behind the model. It taught me to land somewhere new, understand the domain fast, and ship something people actually use.",
     image: blooms,
     imageAlt: "Massif de fleurs saisi en filé, rouges et blancs sur vert",
+    links: [{ label: "Visit", href: "https://www.capgemini.com/" }],
   },
   {
     title: "Deezer",
@@ -80,6 +87,7 @@ const EXPERIENCE: Entry[] = [
       "This is where I learned that a number is worthless until someone can act on it. I supported Deezer's international growth, working directly with Country Directors on marketing strategy and partnerships. My job was less about building models than about making sure the right people trusted the right numbers at the right moment. I got very good at translating between analytics and marketing.",
     image: clouds,
     imageAlt: "Ciel d'été, gros cumulus, grain de pellicule",
+    links: [{ label: "Visit", href: "https://www.deezer.com/en/" }],
   },
   {
     title: "Airbus",
@@ -88,6 +96,7 @@ const EXPERIENCE: Entry[] = [
       "My first job, and I got to ask a genuinely hard question: how confident should you actually be in a 20-year market share forecast? I rebuilt Airbus' Global Delivery Forecast tool by adding Monte Carlo simulations on top of a deterministic model, to quantify where the uncertainty really came from. Non-linear regression, random forests, time series, and an R Shiny app so the whole strategy team could use it without reading a line of code.",
     image: blooms,
     imageAlt: "Massif de fleurs saisi en filé, rouges et blancs sur vert",
+    links: [{ label: "Visit", href: "https://www.airbus.com/en" }],
   },
 ];
 
@@ -143,6 +152,19 @@ const PROJECTS: Entry[] = [
 const ENTRIES: Record<string, Entry[]> = {
   Experience: EXPERIENCE,
   Projects: PROJECTS,
+};
+
+/**
+ * The sections whose aside is simply a phrase, by name. The ones that are a list get a
+ * counter there instead, worked out from the list itself; a section named here has no list
+ * and says something in the same place.
+ *
+ * Strings rather than JSX text, so the apostrophes stay plain ones — an entity in the
+ * middle of a greeting is a thing to avoid.
+ */
+const PHRASE: Record<string, string> = {
+  About: "[ Hi, I'm Marie ]",
+  Contact: "[ Let's talk ]",
 };
 
 /**
@@ -251,6 +273,33 @@ const BLOCK_H = 278;
 const IMAGE_REST_Y = TITLE_TOP + TITLE_LINE + BLOCK_GAP + BLOCK_H / 2;
 
 /**
+ * How far the foot of the page sits above the bottom edge. It is the columns' own
+ * `pb-12`, which is where the four section titles rest when nothing is open — so a mark
+ * placed on this line lands where those words were, rather than at some distance of its
+ * own choosing.
+ */
+const FOOT = 48;
+
+/**
+ * The height About's block is given so its last line can sit on that foot: everything
+ * above the block, plus the foot itself, taken off the window.
+ *
+ * Its last line is pushed there by an auto margin rather than pinned by `position`, which
+ * is the difference between a mark at the bottom of this section and a mark stuck to the
+ * corner of the page. It still belongs to the block — it rises with it, leaves with it,
+ * and if the window is too short for the room this asks for, the margin collapses and the
+ * prose keeps its space.
+ *
+ * The figures above the block are the sm ones, as everywhere else here. Below that
+ * breakpoint the title is smaller and the gap narrower, so the mark comes to rest a little
+ * lower than the foot rather than on it — a few pixels, at the width where the portrait
+ * and the second column are gone anyway.
+ */
+const ABOUT_BLOCK_H = `calc(100dvh - ${
+  TITLE_TOP + TITLE_LINE + BLOCK_GAP + FOOT
+}px)`;
+
+/**
  * The two lines above a summary: an entry's name, and its dates.
  *
  * About has neither and passes null, which renders them empty and hidden. That is the
@@ -292,6 +341,51 @@ const leading = (item: { title: string; dates: string } | null) => (
 
 /** The prose itself, one measure and one set of type wherever it appears. */
 const PROSE = "text-sm leading-relaxed text-neutral-600 sm:text-base";
+
+/**
+ * A link, as this page draws one: a bracketed mark in the mono the dates and the counter
+ * and [ CLOSE ] are set in, whose letters spread apart when it is pointed at. Both the
+ * projects' links and About's coordinates are this, so they are one function — the effect
+ * cannot drift between them.
+ *
+ * The label appears twice, which is not a mistake: the hidden copy is what holds the box
+ * open at the spread width so a growing mark moves nothing beside it. The mechanism is
+ * `.mark` in globals.css, and both copies must carry the same text for it to measure
+ * right.
+ *
+ * `pointer-events`, because every one of these sits inside an overlay that has none — it
+ * is laid over the grid, which is what listens for the click that opens a column. And
+ * `tabIndex`, because that overlay goes aria-hidden while a section closes, and a
+ * focusable node inside a hidden subtree is a fault rather than a nicety.
+ */
+const mark = ({
+  href,
+  label,
+  settled,
+  centred,
+}: {
+  href: string;
+  label: string;
+  settled: boolean;
+  /** Placed on the middle of the page rather than flush to its left margin. */
+  centred?: boolean;
+}) => (
+  <a
+    key={href}
+    href={href}
+    target="_blank"
+    rel="noreferrer"
+    tabIndex={settled ? undefined : -1}
+    className={`mark${
+      centred ? " mark-mid" : ""
+    } pointer-events-auto font-mono text-[10px] tracking-[0.2em] text-neutral-400 transition-colors duration-200 hover:text-neutral-900 sm:text-xs`}
+  >
+    <span aria-hidden className="mark-sizer">
+      [ {label} ]
+    </span>
+    <span className="mark-label">[ {label} ]</span>
+  </a>
+);
 
 export function LiquidColumns() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -650,10 +744,10 @@ export function LiquidColumns() {
   const typedAt = TYPE_START + Math.max(0, label.length - 1) * TYPE_STEP;
   const restAt = typedAt + REST_GAP;
 
-  /** The aside on the title's own baseline. A list says which entry of how many;
-      About introduces the person whose page this is. Two different sentences, but the
-      same mark in the same place — so they are one element with one set of type, and a
-      section without an aside simply has none. */
+  /** The aside on the title's own baseline. A list says which entry of how many; About
+      introduces the person whose page this is, and Contact invites the reason for being
+      there. Different sentences, but the same mark in the same place — so they are one
+      element with one set of type, and a section named nowhere simply has none. */
   const aside =
     opened === null ? null : entries ? (
       <>
@@ -682,11 +776,9 @@ export function LiquidColumns() {
         </span>{" "}
         / {pad(entries.length)} ]
       </>
-    ) : COLUMNS[opened] === "About" ? (
-      // A string rather than JSX text: the apostrophe stays a plain one that way,
-      // without an entity in the middle of a greeting.
-      "[ Hi, I'm Marie ]"
-    ) : null;
+    ) : (
+      (PHRASE[COLUMNS[opened]] ?? null)
+    );
 
   /** The strip of photographs, laid out from `--p`. The alt text belongs to the picture
       that is actually being shown, so only that one carries it. */
@@ -873,29 +965,13 @@ export function LiquidColumns() {
                   moving up or down a line when one entry's summary is shorter than the
                   next one's: the reflow happens at opacity 0.
 
-                  The type is the dates' and the counter's and [ CLOSE ]'s, brackets and
-                  all: this page annotates in mono at 10px, and a link is an annotation
-                  here rather than a button.
-
-                  pointer-events, because the whole block sits in a container that has
-                  none — it is an overlay over the grid, which is what listens for the
-                  click that opens a column. And tabIndex, because that same container
-                  goes aria-hidden while the section closes, and a focusable node inside
-                  a hidden subtree is a fault rather than a nicety. */}
+                  No arrow on them any more. The brackets already say the mark is a mark,
+                  and the letters spreading under the pointer says it is live — an arrow
+                  as well was one sign too many, and the only glyph on the page that was
+                  not a letter, a digit or a bracket. */}
               {shown.links && (
-                <p className="mt-8 flex gap-6 font-mono text-[10px] tracking-[0.2em] text-neutral-400 sm:text-xs">
-                  {shown.links.map((link) => (
-                    <a
-                      key={link.href}
-                      href={link.href}
-                      target="_blank"
-                      rel="noreferrer"
-                      tabIndex={settled ? undefined : -1}
-                      className="pointer-events-auto whitespace-nowrap transition-colors duration-200 hover:text-neutral-900"
-                    >
-                      [ {link.label} ↗ ]
-                    </a>
-                  ))}
+                <p className="mt-8 flex gap-6">
+                  {shown.links.map((link) => mark({ ...link, settled }))}
                 </p>
               )}
             </article>
@@ -931,9 +1007,17 @@ export function LiquidColumns() {
             the block past the height reserved for it. */}
         {opened !== null && COLUMNS[opened] === "About" && (
           <div className="mt-12 sm:mt-16" style={{ minHeight: BLOCK_H }}>
+            {/* A column down to the foot of the page, so the coordinates can be pushed to
+                the far end of it. The reserved height is the floor and not the ceiling —
+                the prose takes what it needs first and the auto margin below it takes
+                whatever is left, which is nothing at all on a window too short to spare
+                any. */}
             <div
-              className={closing ? "depart" : "arrive"}
-              style={{ animationDelay: closing ? "0ms" : `${restAt}ms` }}
+              className={`${closing ? "depart" : "arrive"} flex flex-col`}
+              style={{
+                animationDelay: closing ? "0ms" : `${restAt}ms`,
+                minHeight: ABOUT_BLOCK_H,
+              }}
             >
               <div className="grid grid-cols-1 gap-10 sm:grid-cols-[1fr_auto] xl:grid-cols-[1fr_auto_1fr]">
                 <div className="max-w-[42ch]">
@@ -974,6 +1058,32 @@ export function LiquidColumns() {
                   <p className={`mt-8 sm:mt-10 ${PROSE}`}>{ABOUT_PLACEHOLDER[1]}</p>
                 </div>
               </div>
+
+              {/* Where all of this is written from, as a pair of coordinates rather than
+                  as the name of the place. It closes the section, so it goes to the foot
+                  of the page — on the line the four column titles rest on — and it gets
+                  there by an auto margin rather than by being pinned, so it is still the
+                  last thing in the block's own flow: it rises with the block and leaves
+                  with it.
+
+                  `pt-10` is the floor under that margin. On a window with room to spare
+                  the margin does the work and the padding is invisible; on one without, the
+                  margin collapses to nothing and the padding is all that keeps the mark off
+                  the prose above it.
+
+                  Centred by `text-center` on the page rather than merely between its
+                  neighbours, and for the same reason the portrait above it is — the
+                  insets of the container these sit in are equal, so its middle is the
+                  window's middle. The anchor is inline-grid, which is an inline-level box
+                  and so is what `text-center` centres. */}
+              <p className="mt-auto pt-10 text-center">
+                {mark({
+                  href: "https://www.toulouse-tourisme.com/",
+                  label: "N 43.60079° / E 1.35044°",
+                  settled,
+                  centred: true,
+                })}
+              </p>
             </div>
           </div>
         )}
