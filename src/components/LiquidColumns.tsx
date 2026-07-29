@@ -11,6 +11,7 @@ import {
 // placeholder itself. The filename carries the Unsplash attribution — keep it.
 import clouds from "@/images/experience/viktor-mogilat-jYbBn4m3sW0-unsplash.jpg";
 import blooms from "@/images/experience/roma-kaiuk-KgEteyimvHs-unsplash.jpg";
+import portrait from "@/images/about/marie-vachelard.jpg";
 
 const COLUMNS = ["About", "Experience", "Projects", "Contact"];
 
@@ -66,6 +67,18 @@ const EXPERIENCE = [
     image: blooms,
     imageAlt: "Massif de fleurs saisi en filé, rouges et blancs sur vert",
   },
+];
+
+/**
+ * About's two blocks of prose. Placeholder, and written to say so: it is here to hold
+ * the shape of the arrangement — two columns either side of the portrait — until there
+ * are true words to put in it. Both run four to five lines at the measure below, which
+ * is what the reserved height of a block is sized for; replacing them with anything
+ * much longer will run the second half of each past the bottom of a short window.
+ */
+const ABOUT_PLACEHOLDER = [
+  "Placeholder copy, standing in for the real words until they are written. It is here so the shape of the block can be judged — the measure, the leading, and the way two columns sit either side of a portrait — at the widths the page actually has to work at.",
+  "The second block carries about the same weight, so the pair reads as one arrangement rather than as a column with an afterthought beside it. Nothing in the layout depends on the wording, only on there being four or five lines of it in each.",
 ];
 
 /** Two digits, so a counter never changes width as it climbs. */
@@ -160,6 +173,49 @@ const TITLE_LINE = 60;
 const BLOCK_GAP = 64;
 const BLOCK_H = 278;
 const IMAGE_REST_Y = TITLE_TOP + TITLE_LINE + BLOCK_GAP + BLOCK_H / 2;
+
+/**
+ * The two lines above a summary: an entry's name, and its dates.
+ *
+ * About has neither and passes null, which renders them empty and hidden. That is the
+ * whole mechanism behind the two sections lining up, and it is deliberately not a
+ * measured offset: the space above the prose is held by the same elements carrying the
+ * same type, so the first line of an About block lands exactly where an Experience
+ * summary lands — at every width, without either section knowing the other's figures,
+ * and still true if the heading or the dates are ever restyled.
+ *
+ * `visibility: hidden` rather than a bare spacer: it keeps the line box, and it takes
+ * the empty heading out of the accessibility tree, so nothing announces a nameless
+ * entry with no dates.
+ *
+ * The stand-in has to be a non-breaking space. An ordinary one is collapsible, and a
+ * block whose only content is collapsible whitespace has no line box at all — the
+ * heading would measure zero and the alignment this exists for would be out by its
+ * whole height.
+ */
+const NBSP = " ";
+
+const leading = (item: { title: string; dates: string } | null) => (
+  <>
+    <h2
+      className={`text-lg font-medium tracking-tight text-neutral-900 sm:text-2xl${
+        item ? "" : " invisible"
+      }`}
+    >
+      {item ? item.title : NBSP}
+    </h2>
+    <p
+      className={`mt-2 font-mono text-[10px] tracking-[0.2em] tabular-nums text-neutral-400 sm:text-xs${
+        item ? "" : " invisible"
+      }`}
+    >
+      {item ? item.dates : NBSP}
+    </p>
+  </>
+);
+
+/** The prose itself, one measure and one set of type wherever it appears. */
+const PROSE = "text-sm leading-relaxed text-neutral-600 sm:text-base";
 
 export function LiquidColumns() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -626,9 +682,22 @@ export function LiquidColumns() {
           timed to land just as the cube finishes its flight. They were the last
           things to arrive on the way in, so they are the first to go on the way
           out — they leave with no delay, as the cube sets off home. */}
+      {/* The right edge is only here for About, whose second column and portrait need
+          the width to be placed in. It is inert for the other sections: everything
+          inside is left-aligned block flow, so a container that reaches further right
+          moves nothing — and it has to be this container rather than one of its own,
+          because sharing the parent is what makes the two sections' blocks start on the
+          same line.
+
+          The two insets are deliberately equal, which is what puts About's portrait on
+          the centre of the page rather than merely between its neighbours: the middle
+          column of a `1fr auto 1fr` grid is centred on its container, so the container
+          has to be centred on the window for the two to be the same point. An earlier
+          version carried the Experience photograph's `lg:right-40` here, and the
+          portrait came out 60px left of centre because of it. */}
       <div
         aria-hidden={!settled}
-        className="pointer-events-none absolute left-5 top-36 sm:left-10 sm:top-48"
+        className="pointer-events-none absolute left-5 right-5 top-36 sm:left-10 sm:right-10 sm:top-48"
       >
         {/* Each letter owns both its arriving and its leaving, on its own delay —
             forwards from the first on the way in, backwards from the last on the way
@@ -695,22 +764,92 @@ export function LiquidColumns() {
                 }ms linear`,
               }}
             >
-              <h2 className="text-lg font-medium tracking-tight text-neutral-900 sm:text-2xl">
-                {shown.title}
-              </h2>
-              <p className="mt-2 font-mono text-[10px] tracking-[0.2em] tabular-nums text-neutral-400 sm:text-xs">
-                {shown.dates}
-              </p>
+              {leading(shown)}
                 {/* 48 characters, or whatever the window can spare — whichever is
                     smaller. That measure reads as a column of text rather than a
                     paragraph running the page width, and it is about where five
                     lines land; but it is a fixed width, so on a narrower window it
                     would keep growing into the image on the right. It has to give
                     way instead, or a long line lands under the photo. */}
-              <p className="mt-8 max-w-[min(48ch,44vw)] text-sm leading-relaxed text-neutral-600 sm:mt-10 sm:text-base">
+              <p className={`mt-8 max-w-[min(48ch,44vw)] sm:mt-10 ${PROSE}`}>
                 {shown.summary}
               </p>
             </article>
+            </div>
+          </div>
+        )}
+
+        {/* About: two columns of prose with the portrait between them.
+
+            The box is an Experience description block's box, and not by having been
+            given the same numbers — it is the same parent, the same `mt-12 sm:mt-16`
+            and the same reserved height, so the top of the two cannot drift apart. Each
+            column then reserves the name and dates it does not have, which is what puts
+            its first line of prose on the same line as an Experience summary rather than
+            96px above it.
+
+            The portrait is centred both ways. Across, it is the middle column of the
+            grid on a container with equal insets, which puts it on the centre of the
+            page. Down, it is centred in the reserved height rather than laid out with the
+            prose, so it comes to rest on the same axis as the Experience photograph — the
+            middle of the block, IMAGE_REST_Y — and the two images do not jump when the
+            section changes. Squared off, since the source is square and cropping a face
+            to a letterbox would be a worse picture.
+
+            What shows narrows with the window, because the page is one viewport tall with
+            the overflow clipped and there is nowhere to stack what does not fit: three
+            columns from `xl`, the prose and the portrait from `sm` — which is the
+            Experience arrangement — and the first column alone below that.
+
+            `xl` and not `lg`, which was measured rather than guessed: two 42-character
+            columns and the portrait need about 1280px between the insets. At 1024 they
+            come out 239px wide, which turns four lines into eight and pushes the foot of
+            the block past the height reserved for it. */}
+        {opened !== null && COLUMNS[opened] === "About" && (
+          <div className="mt-12 sm:mt-16" style={{ minHeight: BLOCK_H }}>
+            <div
+              className={closing ? "depart" : "arrive"}
+              style={{ animationDelay: closing ? "0ms" : `${restAt}ms` }}
+            >
+              <div className="grid grid-cols-1 gap-10 sm:grid-cols-[1fr_auto] xl:grid-cols-[1fr_auto_1fr]">
+                <div className="max-w-[42ch]">
+                  {leading(null)}
+                  <p className={`mt-8 sm:mt-10 ${PROSE}`}>{ABOUT_PLACEHOLDER[0]}</p>
+                </div>
+
+                {/* Capped at the height of the block it is centred in, and a share of
+                    the window below that, so it gives way to the prose on a narrow
+                    window the way the Experience photograph does. */}
+                <div
+                  className="hidden items-center justify-center sm:flex"
+                  style={{ height: BLOCK_H }}
+                >
+                  <div
+                    className="relative aspect-square"
+                    style={{ width: `min(26vw, ${BLOCK_H}px)` }}
+                  >
+                    <Image
+                      src={portrait}
+                      alt="Portrait de Marie Vachelard, en noir et blanc"
+                      fill
+                      sizes="26vw"
+                      placeholder="blur"
+                      className="object-cover"
+                    />
+                  </div>
+                </div>
+
+                {/* Pushed to its own right edge rather than left in the middle of the
+                    column, so the arrangement closes on the page's right margin and the
+                    two blocks sit at equal distance from the portrait. It reaches
+                    further right than the Experience photograph does, which is the cost
+                    of a truly centred portrait: the margins have to match, and the
+                    photograph's do not. */}
+                <div className="ml-auto hidden max-w-[42ch] xl:block">
+                  {leading(null)}
+                  <p className={`mt-8 sm:mt-10 ${PROSE}`}>{ABOUT_PLACEHOLDER[1]}</p>
+                </div>
+              </div>
             </div>
           </div>
         )}
