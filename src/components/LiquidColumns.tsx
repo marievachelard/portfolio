@@ -509,6 +509,44 @@ export function LiquidColumns() {
   const typedAt = TYPE_START + Math.max(0, label.length - 1) * TYPE_STEP;
   const restAt = typedAt + REST_GAP;
 
+  /** The aside on the title's own baseline. Experience says which entry of how many;
+      About introduces the person whose page this is. Two different sentences, but the
+      same mark in the same place — so they are one element with one set of type, and a
+      section without an aside simply has none. */
+  const aside =
+    opened === null ? null : COLUMNS[opened] === "Experience" ? (
+      <>
+        [{" "}
+        {/* Turning over rather than fading: the number has its own way of
+            changing, on the same window as the description so the two are one
+            movement. The brackets and the total hold still.
+            Each strip is placed by how far it has been wound, and a transition
+            takes it there — so a position that does not change never moves, and
+            one caught mid-roll by the next entry carries on from where it is.
+            `tabular-nums` belongs here rather than on the aside itself: it is the
+            digits that have to sit on a fixed pitch, and there are none in a word. */}
+        <span className="tabular-nums">
+          {entry.reel.map((n, i) => (
+            <span key={i} className="reel-window">
+              <span
+                className="reel-cells"
+                style={{ "--reel": n } as React.CSSProperties}
+              >
+                {Array.from({ length: 30 }, (_, c) => (
+                  <span key={c}>{c % 10}</span>
+                ))}
+              </span>
+            </span>
+          ))}
+        </span>{" "}
+        / {pad(EXPERIENCE.length)} ]
+      </>
+    ) : COLUMNS[opened] === "About" ? (
+      // A string rather than JSX text: the apostrophe stays a plain one that way,
+      // without an entity in the middle of a greeting.
+      "[ Hi, I'm Marie ]"
+    ) : null;
+
   /** The strip of photographs, laid out from `--p`. The alt text belongs to the picture
       that is actually being shown, so only that one carries it. */
   const strip = () =>
@@ -614,36 +652,17 @@ export function LiquidColumns() {
           </h1>
           {/* Sits on the title's own baseline, so it reads as an annotation to it
               rather than as a second line. */}
-          {opened !== null && COLUMNS[opened] === "Experience" && (
+          {aside && (
             <span
               className={`${
                 closing ? "type-out" : "type-in"
-              } font-mono text-[10px] tracking-[0.2em] tabular-nums text-neutral-400 sm:text-xs`}
+              } whitespace-nowrap font-mono text-[10px] tracking-[0.2em] text-neutral-400 sm:text-xs`}
               // Lands as the last letter does, and leaves before the first of them:
               // it annotates the line, so it comes and goes with the line rather than
               // with the block.
               style={{ animationDelay: closing ? "0ms" : `${typedAt}ms` }}
             >
-              [{" "}
-              {/* Turning over rather than fading: the number has its own way of
-                  changing, on the same window as the description so the two are one
-                  movement. The brackets and the total hold still.
-                  Each strip is placed by how far it has been wound, and a transition
-                  takes it there — so a position that does not change never moves, and
-                  one caught mid-roll by the next entry carries on from where it is. */}
-              {entry.reel.map((n, i) => (
-                <span key={i} className="reel-window">
-                  <span
-                    className="reel-cells"
-                    style={{ "--reel": n } as React.CSSProperties}
-                  >
-                    {Array.from({ length: 30 }, (_, c) => (
-                      <span key={c}>{c % 10}</span>
-                    ))}
-                  </span>
-                </span>
-              ))}{" "}
-              / {pad(EXPERIENCE.length)} ]
+              {aside}
             </span>
           )}
         </div>
