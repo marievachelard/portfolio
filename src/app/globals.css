@@ -91,6 +91,24 @@ a {
   opacity: calc(1 - 0.5 * clamp(0, var(--from-home) / 0.5, 1));
 }
 
+/* The wording, on the pictures' clock rather than on one of its own. Same `--p`, same
+   half a gap, same shape — so the words leave as the picture naming them leaves, and
+   come back as it arrives, at whatever speed the hand is moving.
+
+   What differs is the depth, and deliberately. A picture keeps half of itself on the
+   way past because it is still the thing being dragged and has to stay a thing; a
+   sentence half faded is neither readable nor gone, so this one goes all the way to
+   nothing. Which is also what lets the wording change without being seen to: `--ti`
+   swaps at the midpoint of a crossing, and the midpoint is exactly where this reaches
+   zero — from either side, so there is nothing to jump.
+
+   `--ti` is the entry the words are on, and it is only ever half a gap from `--p`, so
+   the clamp here is a floor at zero rather than a ceiling ever reached. */
+.entry-fade {
+  --from-home: max(var(--ti) - var(--p, 0), var(--p, 0) - var(--ti));
+  opacity: calc(1 - clamp(0, var(--from-home) / 0.5, 1));
+}
+
 /* Opening a section, in two beats.
 
    Keyframes rather than transitions because all of this is mounted at the moment the

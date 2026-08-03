@@ -247,20 +247,19 @@ const SCROLL_PER_ENTRY = 500;
  */
 const SCROLL_SMOOTH = 0.0009;
 /**
- * Where the change fires, as how far the arriving picture still has to travel before
+ * Where the counter turns, as how far the arriving picture still has to travel before
  * it is home — in gaps, so 0.1 is a tenth of the way short of it: around fifty
  * pixels on a laptop, early enough that the change has begun as the picture comes to
- * rest rather than after it.
+ * rest rather than after it. It is what the number rolls on, and what decides which
+ * picture is the one carrying the alt text.
  *
- * Everything in the text column ignores the scroll and waits for that. Then it plays
- * on its own clock: the wording out, swapped, and back, and the number turning over
- * its notch. A picture being dragged is one thing; the words naming it are another,
- * and following the hand made them feel tied to the wheel rather than to the
- * photograph.
+ * The wording no longer waits for it. That used to be the whole text column: it ignored
+ * the scroll, and when this fired it played out and back on a clock of its own. The
+ * wording is read off the position now, the same way the pictures are and over the same
+ * half a gap, so it leaves and returns at whatever speed the hand is moving. What it
+ * does not share with them is the depth — see `.entry-fade` in the stylesheet.
  */
 const HANDOVER = 0.1;
-const TEXT_OUT_MS = 200;
-const TEXT_IN_MS = 400;
 
 /**
  * Opening a section, counted from the click. The title is struck out a letter at a
@@ -485,8 +484,9 @@ export function LiquidColumns() {
   // to say so. The position of the photographs is not state: it changes every frame,
   // and re-rendering the page at that rate to move two pictures would be absurd.
   const [entry, setEntry] = useState(() => ({ index: 0, reel: reelStart(0) }));
-  // The wording trails the change by its own fade-out: it leaves on the old entry,
-  // and only once it is gone does it swap and come back.
+  // Which entry the wording is on. It trails nothing and waits for nothing: it is the
+  // entry the strip is nearest, and it changes at the midpoint of a crossing — see
+  // `paint` below for why that is the one place it can.
   const [textIndex, setTextIndex] = useState(0);
   const mainRef = useRef<HTMLElement>(null);
 
@@ -503,12 +503,6 @@ export function LiquidColumns() {
   const at = useRef(0);
   const want = useRef(0);
   const rafId = useRef(0);
-
-  useEffect(() => {
-    if (textIndex === entry.index) return;
-    const t = setTimeout(() => setTextIndex(entry.index), TEXT_OUT_MS);
-    return () => clearTimeout(t);
-  }, [entry.index, textIndex]);
 
   // Wheel-dragged, not wheel-triggered. The deltas move a continuous position, the
   // position chases it with an ease, and everything is placed from it — so the
@@ -551,6 +545,16 @@ export function LiquidColumns() {
             : { index: nearest, reel: reelWind(was.reel, was.index, nearest) },
         );
       }
+      // The wording, which takes no threshold at all: it is on whichever entry is
+      // nearest, so it changes at the midpoint of a crossing. That is the one place it
+      // can change without being seen doing it — half a gap out is exactly where the
+      // fade has taken it to nothing, and it is the same half a gap on either side of
+      // the swap, so nothing jumps across it. A threshold like HANDOVER would put the
+      // change somewhere the wording is legible again.
+      //
+      // Called every frame and almost always a no-op: React drops a set to the value
+      // already held, so this costs a render once per crossing, not once per frame.
+      setTextIndex(nearest);
     };
 
     const tick = (now: number) => {
@@ -864,7 +868,7 @@ export function LiquidColumns() {
     ));
 
   /**
-   * The entry the words are on, which trails the one the pictures are on by a fade.
+   * The entry the words are on.
    *
    * Clamped rather than indexed straight. `textIndex` outlives the section that set it —
    * it is reset in `open()`, batched with `opened`, so no render should ever see it point
@@ -872,8 +876,6 @@ export function LiquidColumns() {
    * being wrong about that is reading `.summary` off nothing.
    */
   const shown = entries?.[Math.min(textIndex, entries.length - 1)];
-  /** The wording has caught up with the change, so it belongs on screen. */
-  const textSettled = textIndex === entry.index;
 
   return (
     <main
@@ -1006,15 +1008,13 @@ export function LiquidColumns() {
               className={closing ? "depart" : "arrive"}
               style={{ animationDelay: closing ? "0ms" : `${restAt}ms` }}
             >
-            {/* Out quickly, back more slowly, and the wording only swaps once it has
-                gone — so the old line and the new one are never both legible. */}
+            {/* The scroll fade. `--ti` is the entry the wording is on; the stylesheet
+                works its distance from `--p` and fades on it, the same shape the
+                pictures use and all the way to nothing. Nothing here has a duration:
+                the speed of the fade is the speed of the hand. */}
             <article
-              style={{
-                opacity: textSettled ? 1 : 0,
-                transition: `opacity ${
-                  textSettled ? TEXT_IN_MS : TEXT_OUT_MS
-                }ms linear`,
-              }}
+              className="entry-fade"
+              style={{ "--ti": textIndex } as React.CSSProperties}
             >
               {leading(shown)}
                 {/* 48 characters, or whatever the window can spare — whichever is
