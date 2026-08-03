@@ -67,12 +67,28 @@ a {
 .frame-layer {
   position: absolute;
   inset: 0;
+  /* How far this picture is from home, in gaps and never negative — `max` of the
+     difference and its negative, since CSS has no absolute value everywhere yet. */
+  --from-home: max(var(--i) - var(--p, 0), var(--p, 0) - var(--i));
   transform: translateY(
     calc(
       (var(--i) - var(--p, 0)) *
         (max(var(--rest, 50vh), 100vh - var(--rest, 50vh)) + 60%)
     )
   );
+  /* Only the picture that is home is fully there. Anywhere else it is at half, and the
+     half in between is spent over the first half of a gap: by the time a picture is
+     half way out of the frame it has given up all of it, and the one arriving has taken
+     it all back over the same distance. So a crossing reads as one picture handing the
+     light to the next rather than as two pictures sliding.
+
+     Read off `--p`, not switched on it. There is no transition here and nothing to fire
+     at the moment an entry changes: the position moves every frame and the opacity is
+     a function of it, so it is as smooth as the movement is and it stops when the hand
+     stops. Which also means a strip left to rest between two entries is honest about
+     it: half a gap out is where the half is spent, so both pictures are down at 50% and
+     neither of them claims to be the one being looked at. */
+  opacity: calc(1 - 0.5 * clamp(0, var(--from-home) / 0.5, 1));
 }
 
 /* Opening a section, in two beats.
