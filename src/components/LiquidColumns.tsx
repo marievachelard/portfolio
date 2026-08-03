@@ -8,14 +8,17 @@ import {
   type BlobRenderer,
 } from "@/lib/blobRenderer";
 // Static import, so Next reads the dimensions at build time and generates the blur
-// placeholder itself. The filename carries the Unsplash attribution — keep it.
-import clouds from "@/images/experience/viktor-mogilat-jYbBn4m3sW0-unsplash.jpg";
-import blooms from "@/images/experience/roma-kaiuk-KgEteyimvHs-unsplash.jpg";
+// placeholder itself. Every photograph here is Marie's own, so there is no attribution
+// to carry in the filename — they are named for what is in them. One per entry, in the
+// order the entries come. All six are 3:4 upright out of a phone, which is also the
+// frame they are shown in, so each one is shown whole.
+import market from "@/images/experience/busan-market-street.jpg";
+import poolside from "@/images/experience/rooftop-pool-palms.jpg";
+import stage from "@/images/experience/open-air-stage.jpg";
+import dome from "@/images/experience/toulouse-garonne-dome.jpg";
 import portrait from "@/images/about/marie-vachelard.jpg";
-// The projects' photographs are Marie's own, so there is no attribution to carry in
-// the filename — they are named for what is in them.
-import marathon from "@/images/projects/strava-paris-marathon.jpg";
-import figurines from "@/images/projects/hackaviz-toulouse.jpg";
+import shopfront from "@/images/projects/shop-window-paintings.jpg";
+import ridge from "@/images/projects/mountain-ridge-hiker.jpg";
 
 const COLUMNS = ["About", "Experience", "Projects", "Contact"];
 
@@ -35,7 +38,7 @@ type Entry = {
   title: string;
   dates: string;
   summary: string;
-  image: typeof clouds;
+  image: typeof market;
   imageAlt: string;
   links?: { label: string; href: string }[];
 };
@@ -66,9 +69,10 @@ const EXPERIENCE: Entry[] = [
     dates: "2022 – Present",
     summary:
       "I joined as the first data person and I'm still here, building the data function from the ground up. The strategy, the BI platform, the engineering standards, the team of six: all of it started as a blank page. My job today is less about writing queries than about creating the conditions for six people to write better ones. I lead the Data pole as an Engineering Manager, which means owning both the technical direction and the humans behind it.",
-    image: clouds,
+    image: market,
     /** Describes the frame, since nothing in the text does it. */
-    imageAlt: "Ciel d'été, gros cumulus, grain de pellicule",
+    imageAlt:
+      "Une rue de marché à Busan, un couple qui s'éloigne bras dessus bras dessous sous les câbles",
     links: [{ label: "Visit", href: "https://pictarine.com/en" }],
   },
   {
@@ -76,8 +80,9 @@ const EXPERIENCE: Entry[] = [
     dates: "2018 – 2022",
     summary:
       "Four years, five countries, and a lot of very different projects. I worked on-site in Hamburg, Madrid, Cadiz, Singapore and Paris, on everything from aircraft quality control at Airbus to unsupervised learning on cybersecurity threats. Some missions I led solo, others with a team, always with a client in the room and a business question behind the model. It taught me to land somewhere new, understand the domain fast, and ship something people actually use.",
-    image: blooms,
-    imageAlt: "Massif de fleurs saisi en filé, rouges et blancs sur vert",
+    image: poolside,
+    imageAlt:
+      "Une piscine sur un toit au petit matin, palmiers et ville dans la brume",
     links: [{ label: "Visit", href: "https://www.capgemini.com/" }],
   },
   {
@@ -85,8 +90,9 @@ const EXPERIENCE: Entry[] = [
     dates: "2017 – 2018",
     summary:
       "This is where I learned that a number is worthless until someone can act on it. I supported Deezer's international growth, working directly with Country Directors on marketing strategy and partnerships. My job was less about building models than about making sure the right people trusted the right numbers at the right moment. I got very good at translating between analytics and marketing.",
-    image: clouds,
-    imageAlt: "Ciel d'été, gros cumulus, grain de pellicule",
+    image: stage,
+    imageAlt:
+      "Un concert en plein air au soleil couchant, le groupe en bleu et la foule de dos",
     links: [{ label: "Visit", href: "https://www.deezer.com/en/" }],
   },
   {
@@ -94,8 +100,9 @@ const EXPERIENCE: Entry[] = [
     dates: "2016 – 2017",
     summary:
       "My first job, and I got to ask a genuinely hard question: how confident should you actually be in a 20-year market share forecast? I rebuilt Airbus' Global Delivery Forecast tool by adding Monte Carlo simulations on top of a deterministic model, to quantify where the uncertainty really came from. Non-linear regression, random forests, time series, and an R Shiny app so the whole strategy team could use it without reading a line of code.",
-    image: blooms,
-    imageAlt: "Massif de fleurs saisi en filé, rouges et blancs sur vert",
+    image: dome,
+    imageAlt:
+      "La Garonne à Toulouse au petit matin, le dôme de la Grave reflété dans l'eau",
     links: [{ label: "Visit", href: "https://www.airbus.com/en" }],
   },
 ];
@@ -117,9 +124,9 @@ const PROJECTS: Entry[] = [
     dates: "2026",
     summary:
       "Four of us turned the Hackaviz brief — public spending and well-being — into a scrolling story: two women born the same year, one Greek, one Portuguese, whose governments answered the 2008 crisis in opposite ways. It was also the first thing any of us built with Claude Code.",
-    image: figurines,
+    image: shopfront,
     imageAlt:
-      "Quatre figurines de bronze assises sur une poutre, une silhouette floue derrière",
+      "Une vitrine de librairie couverte d'affiches d'exposition, deux petites toiles peintes à la main posées sur le rebord",
     links: [
       { label: "Visit", href: "https://marievachelard.github.io/hackaviz_2026/" },
       { label: "GitHub", href: "https://github.com/marievachelard/hackaviz_2026" },
@@ -130,9 +137,9 @@ const PROJECTS: Entry[] = [
     dates: "2025",
     summary:
       "I wanted my own running data back out of Strava's app, so I built a Streamlit dashboard on top of its API: distance, pace, and the shape of a training block over time. It started as an excuse to learn the API properly and turned into the thing I actually open after a long run.",
-    image: marathon,
+    image: ridge,
     imageAlt:
-      "Coureurs du marathon de Paris sur les pavés, l'Arc de Triomphe au fond",
+      "Un randonneur seul sur une crête rocheuse, la main en visière, les montagnes dans la brume",
     links: [
       { label: "Visit", href: "https://strava-activity-tracker.streamlit.app/" },
       {
@@ -293,6 +300,36 @@ const TITLE_LINE = 60;
 const BLOCK_GAP = 64;
 const BLOCK_H = 278;
 const IMAGE_REST_Y = TITLE_TOP + TITLE_LINE + BLOCK_GAP + BLOCK_H / 2;
+
+/**
+ * What to tell the browser about the width of a photograph in the frame. The frame is
+ * the photographs' own 3:4, so nothing is cropped and this is simply the frame's width:
+ * its `26vw` up to the 320px it stops at, which it reaches at a 1231px window.
+ *
+ * The frame's third term, the one that shrinks it on a short window, is left out. A
+ * `sizes` cannot see the height of the window, and leaving it out errs towards asking
+ * for a larger picture than is needed rather than a smaller one.
+ */
+const IMAGE_SIZES = "(min-width: 1231px) 320px, 26vw";
+
+/**
+ * Where the measure ends, and so where the half of the line the photograph has to itself
+ * begins: the columns' own `left-10` gutter plus the width the prose is held to.
+ *
+ * The photograph used to be pinned a fixed 160px in from the right edge, put there to
+ * keep it nearer the text than the frame. A fixed number cannot do that: how much white
+ * it leaves on the near side depends on the measure and on how wide the picture is that
+ * day, and by the end it was leaving well over twice as much there as on the far side —
+ * the picture read as pushed up against the right edge rather than as sitting in its
+ * half of the page. Centred in that half instead, it is the same intent expressed as a
+ * relation rather than as a number, and it survives both of those changing.
+ *
+ * That makes this figure the prose's `max-w-[min(48ch,44vw)]`, and the two have to be
+ * changed together. `ch` resolves here the same as it does there — both are on the
+ * inherited 16px, the prose only dropping to `text-sm` below `sm`, where the photograph
+ * is not shown at all.
+ */
+const MEASURE_END = "calc(2.5rem + min(48ch, 44vw))";
 
 /**
  * How far the foot of the page sits above the bottom edge. It is the columns' own
@@ -819,7 +856,7 @@ export function LiquidColumns() {
           src={item.image}
           alt={i === entry.index ? item.imageAlt : ""}
           fill
-          sizes="34vw"
+          sizes={IMAGE_SIZES}
           placeholder="blur"
           className="object-cover"
         />
@@ -1158,25 +1195,48 @@ export function LiquidColumns() {
           cannot share a line, and the page cannot scroll to stack them — it is one
           viewport tall with the overflow clipped.
 
-          Pulled in from the right edge so it sits nearer the text than the frame,
-          but only from `lg` up: at the narrow end of `sm` the measure and the image
-          already almost touch, and moving it left there would land it on the words. */}
+          This element is not the picture, it is the half of the line the picture has:
+          from the end of the measure to the columns' own right gutter. The picture
+          centres itself in it with `mx-auto`, which is why nothing here says how far
+          from the right edge it should sit — that distance is whatever is left over,
+          and it comes out the same on both sides at every width. */}
       {entries && (
         <div
-          className="pointer-events-none absolute right-10 hidden -translate-y-1/2 sm:block lg:right-40"
+          className="pointer-events-none absolute right-10 hidden -translate-y-1/2 sm:block"
           // Its resting height, and the same figure handed to the CSS: the spacing
           // between two photographs is worked out from it, since a strip that rests
           // off-centre has further to travel to clear the top of the window.
-          style={{ top: IMAGE_REST_Y, "--rest": `${IMAGE_REST_Y}px` } as React.CSSProperties}
+          style={
+            {
+              top: IMAGE_REST_Y,
+              left: MEASURE_END,
+              "--rest": `${IMAGE_REST_Y}px`,
+            } as React.CSSProperties
+          }
         >
-          {/* Two things about this wrapper: the reveal owns `transform` for its rise,
-              so the centring translate has to live on the parent rather than fight it
-              here; and the frame is 1.85:1 while the source is 3:2, so `fill` plus
-              object-cover crops the top and bottom instead of squashing. */}
+          {/* The reveal owns `transform` for its rise, so the centring translate has to
+              live on the parent rather than fight it here.
+
+              The frame is 3:4 upright, which is what the photographs already are, so
+              object-cover has nothing to crop and each one is shown whole.
+
+              The first and last terms are the size, and they are one figure in two
+              forms: 26vw is what it takes on a window narrower than 1231px, 320px is
+              where it stops growing on one wider. Upright, the frame reads much larger
+              than the same width did lying down — its height is 4/3 of it rather than
+              1/1.85 — so these are well under the 34vw and 560px the landscape frame
+              had. Changing the size is changing these two together; keep the ratio
+              between them or the breakpoint below moves.
+
+              The middle term is not a size, it is the foot of the window. The frame is
+              centred on IMAGE_REST_Y, so half its height has to fit in what is left
+              below 455 — less a 24px margin, which is where 479 comes from, and times
+              3/2 to read back as a width. It only governs below about 690px of window
+              height; above that the frame is already smaller than it allows. */}
           <div
             className={`${
               closing ? "depart" : "arrive"
-            } relative aspect-[1.85/1] w-[34vw] max-w-[560px]`}
+            } relative mx-auto aspect-[3/4] w-[min(26vw,calc((100dvh_-_479px)*3/2),320px)]`}
             style={{ animationDelay: closing ? "0ms" : `${restAt}ms` }}
           >
             {/* Every entry is laid out from the same position, a screen apart.
