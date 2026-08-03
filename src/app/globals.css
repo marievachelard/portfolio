@@ -89,6 +89,17 @@ a {
      it: half a gap out is where the half is spent, so both pictures are down at 50% and
      neither of them claims to be the one being looked at. */
   opacity: calc(1 - 0.5 * clamp(0, var(--from-home) / 0.5, 1));
+  /* And the colour on the same clock, over the same half a gap: a picture in transit is
+     grey, and it takes its colour back only as it comes home. Read off `--p` like the
+     light is, so the two are one movement — the entry being looked at is the only one in
+     colour, and the fraction of colour a neighbour has is the fraction of the way it has
+     come.
+
+     Where the two differ is at the far end. The light stops at a half because a picture
+     being dragged has to stay a thing you can see; the colour goes all the way out,
+     because a grey photograph is still a photograph and there is nothing to lose by it.
+     So the grey is what carries the crossing and the light merely dims. */
+  filter: grayscale(clamp(0, var(--from-home) / 0.5, 1));
 }
 
 /* The wording, on the pictures' clock rather than on one of its own. Same `--p`, same
