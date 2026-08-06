@@ -27,26 +27,33 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), system-ui, sans-serif;
-  /* A small spark in the ink of the titles instead of an arrow.
-     Drawn by the browser as a cursor image rather than by an element following the
-     pointer: nothing to keep in sync, and it cannot lag behind the hand. The hotspot
-     is the middle of the shape, so the spark sits exactly where the pointer is.
-     #171717 is spelled out because a data URI cannot read a custom property — it is
-     neutral-900, the same ink as the titles, and has to be changed with them. */
-  cursor:
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 75.56 75.76'%3E%3Cpolygon points='75.56 46.08 75.56 29.67 48.07 29.94 63.51 6.77 51.5 0 37.75 23.79 24.27 .02 12.25 6.79 27.42 29.94 0 29.67 0 46.08 27.46 45.55 12.23 68.79 24.27 75.75 37.75 51.69 51.49 75.76 63.54 68.81 48.03 45.55 75.56 46.08' fill='%23171717'/%3E%3C/svg%3E")
-      6 6,
-    auto;
 }
 
-/* Tailwind's preflight gives buttons their own `cursor: default`, and an anchor gets
-   `cursor: pointer` from the browser — either swaps the dot back out over the few
-   interactive things on the page, which reads as the custom cursor breaking rather than
-   as a hint. What a project's links are is said by their brackets and by the ink they
-   take on hover. */
+/* The spark (CustomCursor.tsx) needs `<html>`'s own cursor set to none — the OS arrow
+   has to be gone before the SVG spark can stand in for it. Tailwind's preflight gives
+   buttons their own `cursor: default`, and an anchor gets `cursor: pointer` from the
+   browser — either swaps the arrow back in over the few interactive things on the
+   page. `inherit` forces them back onto whatever `<html>` is set to instead of their
+   own default, which is "none" once the cursor component has taken over, and the
+   browser's own arrow on touch devices or before it has. What a project's links are is
+   said by their brackets and by the ink they take on hover. */
 button,
 a {
   cursor: inherit;
+}
+
+/* A small spark in the ink of the titles instead of an arrow, turning slowly for a
+   little dynamism a still image can't have. Position comes from CustomCursor.tsx on
+   every pointer move; the spin is free-running CSS so it never waits on JS to tick. */
+@keyframes cursor-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.cursor-spark {
+  transform-origin: 50% 50%;
+  animation: cursor-spin 6s linear infinite;
 }
 
 /* ---------------------------- changing experience ----------------------------
@@ -294,5 +301,9 @@ a {
   .reel-cells,
   .mark-label {
     transition-duration: 1ms;
+  }
+
+  .cursor-spark {
+    animation: none;
   }
 }
