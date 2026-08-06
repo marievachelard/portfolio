@@ -204,18 +204,18 @@ a {
 
 /* ------------------------------ the marks that link ------------------------------
    A link on this page is a mark in mono with brackets around it, the same as [ CLOSE ]
-   and the counter. Hovering one spreads its letters apart — tracking-in-expand, run as
-   a hover rather than as an entrance, and reversing itself on the way out because it is
-   a transition rather than a keyframe.
+   and the counter. It rests with its letters spread apart, and the cursor closes them
+   up on the way over — tracking-in-contract, run as a hover rather than as an entrance,
+   and reversing itself on the way out because it is a transition rather than a keyframe.
 
    Spreading letters is spreading the box: letter-spacing puts its space after every
-   character, the last one included, so a mark that grows on hover pushes whatever sits
-   to its right. [ Visit ] would shove [ GitHub ] twenty pixels sideways.
+   character, the last one included, so a mark whose width changed would push whatever
+   sits to its right. [ Visit ] would shove [ GitHub ] twenty pixels sideways.
 
-   So the box is sized for the spread state and never changes. A second copy of the
-   label sits in the same grid cell at the tracking the visible one reaches, hidden but
-   still measured, and holds the width open; the visible label is centred in it and
-   grows into room that was already reserved. Nothing moves but the letters.
+   So the box is sized for the spread state — the resting one now — and never changes.
+   A second copy of the label sits in the same grid cell at that tracking, hidden but
+   still measured, and holds the width open; the visible label sits inside it and only
+   ever tightens into room that was already reserved. Nothing moves but the letters.
 
    The copy is aria-hidden, or the label would be announced twice. */
 .mark {
@@ -223,10 +223,10 @@ a {
   display: inline-grid;
 }
 
-/* Anchored to the box's left edge, not centred in it. The box is wider than the resting
-   label — that is the room the spread grows into — and a label centred in it would sit
-   half that room clear of the page's left margin, which every other line in a section is
-   flush to. So the letters push rightwards from a fixed left edge instead. */
+/* Anchored to the box's left edge, not centred in it, so the first character always
+   sits on the page's own left margin — the letters that close up on hover pull inward
+   from there rather than the whole mark drifting to stay centred in room it no longer
+   fills. */
 .mark > * {
   grid-area: 1 / 1;
   justify-self: start;
@@ -245,16 +245,19 @@ a {
   letter-spacing: var(--mark-open);
 }
 
-/* No resting value of its own: it inherits the 0.2em the mono marks are all set in, so
-   the two ends of the movement are the page's tracking and this one. */
+/* Spread at rest, which now needs a value of its own — it's the hovered state that
+   borrows one instead, inheriting the 0.2em the mono marks are all set in rather than
+   restating it here, so the two ends of the movement are still this one and the page's
+   own tracking. */
 .mark-label {
+  letter-spacing: var(--mark-open);
   transition: letter-spacing 320ms cubic-bezier(0.215, 0.61, 0.355, 1);
 }
 
 /* Keyboard gets the same answer as the pointer — it is the only sign the mark is live. */
 .mark:hover .mark-label,
 .mark:focus-visible .mark-label {
-  letter-spacing: var(--mark-open);
+  letter-spacing: inherit;
 }
 
 /* The counter. One strip of digits per position, stacked one per line behind a
