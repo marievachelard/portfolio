@@ -11,6 +11,7 @@ const HALF = SIZE / 2;
 
 export default function CustomCursor() {
   const ref = useRef<HTMLDivElement>(null);
+  const spinRef = useRef<SVGSVGElement>(null);
 
   useEffect(() => {
     // Fine-pointer devices only — touch has no hovering cursor to replace, and
@@ -18,11 +19,17 @@ export default function CustomCursor() {
     if (!window.matchMedia("(pointer: fine)").matches) return;
 
     const el = ref.current;
-    if (!el) return;
+    const spin = spinRef.current;
+    if (!el || !spin) return;
 
     const move = (e: PointerEvent) => {
       el.style.transform = `translate3d(${e.clientX - HALF}px, ${e.clientY - HALF}px, 0)`;
       el.style.opacity = "1";
+      // Same "a, button" the page hands its own hover ink to (globals.css) — the
+      // spark holds still over them too, so the turning reads as idle motion rather
+      // than as something fighting the thing it's pointing at.
+      const overLink = (e.target as Element | null)?.closest?.("a, button");
+      spin.style.animationPlayState = overLink ? "paused" : "running";
     };
 
     // `mouseout` with a null `relatedTarget` is the cross-browser signal that the
@@ -64,6 +71,7 @@ export default function CustomCursor() {
       }}
     >
       <svg
+        ref={spinRef}
         className="cursor-spark"
         width={SIZE}
         height={SIZE}
