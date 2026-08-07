@@ -113,13 +113,8 @@ export function SpecSheetAboutGrid({
         >
           {image}
         </div>
-        {/* Right-aligned: at full width, left-aligned text on both sides would hug the
-            image on this column (its near edge) rather than the outer margin — not a
-            mirror of prose1, which hugs its own outer margin because that IS its left
-            edge. Aligning right puts this column's ragged edge on the image side and
-            its flush edge on the outer margin, the true mirror. */}
         <div
-          className="hidden text-right xl:block"
+          className="hidden xl:block"
           style={{ gridColumn: "b14 / b15", gridRow: "r8 / r9", width: "100%", padding: "0 8px" }}
         >
           {prose2}
