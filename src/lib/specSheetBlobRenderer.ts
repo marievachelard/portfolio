@@ -111,13 +111,18 @@ const MAX_DPR = 1.4;
 export function dockGeometry(cssW: number, cssH: number) {
   const unit = Math.min(DOCK_UNIT, cssW * 0.13);
   const reach = unit * CUBE_HALF * 1.45;
-  const inset = Math.max(
+  const insetX = Math.max(
     reach + 14,
     Math.min(DOCK_INSET, cssW * 0.16, cssH * 0.16),
   );
-  // Docks top-right on this page instead of top-left — everything else about
-  // the geometry (unit, reach, vertical inset) is unchanged.
-  return { x: cssW - inset, y: inset, unit, reach };
+  // Docks top-right on this page instead of top-left, and its vertical centre is
+  // pinned to the title's own centre rather than a corner inset — 144/192px is
+  // the title container's top-36/sm:top-48 in SpecSheetColumns.tsx, and 40/60px
+  // is the h1's own line height below/at `sm` (text-4xl's default leading, then
+  // text-6xl's, which TITLE_LINE already documents as exactly 60). Half of each,
+  // added to the top, is the centre of the line.
+  const titleCenterY = cssW >= 640 ? 192 + 30 : 144 + 20;
+  return { x: cssW - insetX, y: titleCenterY, unit, reach };
 }
 
 function compile(gl: WebGL2RenderingContext, type: number, src: string) {
