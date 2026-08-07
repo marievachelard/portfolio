@@ -132,7 +132,19 @@ export function SpecSheetAboutGrid({
         >
           {prose2}
         </div>
-        <div className="text-center" style={{ gridColumn: "1 / -1", gridRow: "r11 / r12" }}>
+        {/* Centred on both axes within its cell — full width, flexed rather than
+            text-align, so the vertical centring (align-items) and the horizontal
+            (justify-content) come from the same mechanism. */}
+        <div
+          style={{
+            gridColumn: "1 / -1",
+            gridRow: "r11 / r12",
+            width: "100%",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
           {legend}
         </div>
       </div>
