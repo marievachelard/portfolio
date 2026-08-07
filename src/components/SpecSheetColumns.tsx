@@ -486,6 +486,15 @@ export function SpecSheetColumns() {
   const [devPanelValues, setDevPanelValues] = useState<DevPanelValues>(
     DEFAULT_DEV_PANEL_VALUES,
   );
+  // The measure() effect below only runs once (on mount) — its closure would
+  // otherwise see whichever devPanelValues existed at that first render, not later
+  // ones from the dev panel. Synced in its own effect (never write a ref directly
+  // during render) so measure() can read the latest value regardless of when it's
+  // called.
+  const devPanelValuesRef = useRef(devPanelValues);
+  useEffect(() => {
+    devPanelValuesRef.current = devPanelValues;
+  }, [devPanelValues]);
   useEffect(() => {
     // Deliberate: reading localStorage during the lazy useState initializer would run
     // on both the server (SSR) and the client's first render, and disagree — the
@@ -645,8 +654,26 @@ export function SpecSheetColumns() {
       );
       // Guarded: measure() also runs from a pointermove that missed, and that is no
       // place to be setting state on every event.
-      const next = dockGeometry(window.innerWidth, window.innerHeight);
-      setDock((was) => (was.x === next.x && was.reach === next.reach ? was : next));
+      const base = dockGeometry(window.innerWidth, window.innerHeight);
+      // Overrides dockGeometry's own corner-based x/y: the cube's centre lines up
+      // with the title's own vertical centre (same titleSpace box the title itself
+      // is now centred in — see the titleSpace comment above), and its right edge
+      // is floored to the outer margin line rather than a fixed corner inset, so it
+      // never overhangs past it however wide that margin is set.
+      const dv = devPanelValuesRef.current;
+      const dvTitleSpace = dv.titleTop + TITLE_LINE - dv.marginTop - 1;
+      const dockY = dv.marginTop + 1 + dvTitleSpace / 2;
+      const dockX = window.innerWidth - dv.marginRight - base.reach;
+      const next = { ...base, x: dockX, y: dockY };
+      setDock((was) =>
+        was.x === next.x && was.y === next.y && was.reach === next.reach
+          ? was
+          : next,
+      );
+      if (renderer.current) {
+        renderer.current.target.dockX = dockX;
+        renderer.current.target.dockY = dockY;
+      }
     };
     remeasure.current = measure;
     measure();
@@ -669,6 +696,15 @@ export function SpecSheetColumns() {
       renderer.current = null;
     };
   }, []);
+
+  // Re-run the cube's dock geometry whenever a slider changes — measure() reads
+  // devPanelValuesRef itself, but nothing else prompts it to run again between
+  // resizes, and a margin/title slider is exactly the kind of change that has to
+  // move the cube immediately, not on the next resize.
+  useEffect(() => {
+    remeasure.current?.();
+    renderer.current?.wake();
+  }, [devPanelValues]);
 
   const handleDevPanelChange = (next: DevPanelValues) => {
     setDevPanelValues(next);

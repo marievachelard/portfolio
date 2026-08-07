@@ -37,6 +37,15 @@ export type BlobTarget = {
   /** pointer position, CSS px */
   pointerX: number;
   pointerY: number;
+  /**
+   * Override the docked position dockGeometry() would otherwise compute, CSS px.
+   * `null` (the default) falls back to that built-in corner geometry — this only
+   * exists so the page can line the cube up with something it knows about (the
+   * title's own vertical centre, the margin's own right edge) that this renderer
+   * has no way to know about on its own.
+   */
+  dockX: number | null;
+  dockY: number | null;
 };
 
 export type BlobRenderer = {
@@ -186,6 +195,8 @@ export function createBlobRenderer(canvas: HTMLCanvasElement): BlobRenderer | nu
     colHeight: 0,
     pointerX: 0,
     pointerY: 0,
+    dockX: null,
+    dockY: null,
   };
 
   // Eased state. `x`/`y` are CSS px. There is one body and it changes column in a
@@ -281,8 +292,8 @@ export function createBlobRenderer(canvas: HTMLCanvasElement): BlobRenderer | nu
     // the inset is floored by how far its tilted corners actually project — that is
     // what stops it hanging off the left edge on a phone.
     const dock = dockGeometry(cssW, cssH);
-    const dockX = dock.x;
-    const dockY = dock.y;
+    const dockX = target.dockX ?? dock.x;
+    const dockY = target.dockY ?? dock.y;
     const wantUnit = target.docked ? dock.unit : wantW / 2;
 
     if (!seeded && target.active) {
