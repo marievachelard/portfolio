@@ -1047,104 +1047,69 @@ export function SpecSheetColumns() {
           </div>
         )}
 
-        {/* About: two columns of prose with the portrait between them.
-
-            The box is an Experience description block's box, and not by having been
-            given the same numbers — it is the same parent, the same `mt-12 sm:mt-16`
-            and the same reserved height, so the top of the two cannot drift apart. Each
-            column then reserves the name and dates it does not have, which is what puts
-            its first line of prose on the same line as an Experience summary rather than
-            96px above it.
-
-            The portrait is centred both ways. Across, it is the middle column of the
-            grid on a container with equal insets, which puts it on the centre of the
-            page. Down, it is centred in the reserved height rather than laid out with the
-            prose, so it comes to rest on the same axis as the Experience photograph — the
-            middle of the block, IMAGE_REST_Y — and the two images do not jump when the
-            section changes. Squared off, since the source is square and cropping a face
-            to a letterbox would be a worse picture.
-
-            What shows narrows with the window, because the page is one viewport tall with
-            the overflow clipped and there is nowhere to stack what does not fit: three
-            columns from `xl`, the prose and the portrait from `sm` — which is the
-            Experience arrangement — and the first column alone below that.
-
-            `xl` and not `lg`, which was measured rather than guessed: two 42-character
-            columns and the portrait need about 1280px between the insets. At 1024 they
-            come out 239px wide, which turns four lines into eight and pushes the foot of
-            the block past the height reserved for it. */}
+        {/* About, "spec sheet" layout: three equal columns (prose, portrait,
+            prose) inside a ruled frame (SpecSheetGrid, mounted just outside
+            this title container). The horizontal rules — under the title,
+            and above the coordinates — are borders on this block's own
+            wrapper and on the legend paragraph, so they always span exactly
+            the same width as the frame around them, whatever the content's
+            height turns out to be. */}
         {opened !== null && COLUMNS[opened] === "About" && (
           <div className="mt-12 sm:mt-16" style={{ minHeight: BLOCK_H }}>
-            {/* A column down to the foot of the page, so the coordinates can be pushed to
-                the far end of it. The reserved height is the floor and not the ceiling —
-                the prose takes what it needs first and the auto margin below it takes
-                whatever is left, which is nothing at all on a window too short to spare
-                any. */}
             <div
-              className={`${closing ? "depart" : "arrive"} flex flex-col`}
+              className={`${closing ? "depart" : "arrive"} flex flex-col border-t`}
               style={{
                 animationDelay: closing ? "0ms" : `${restAt}ms`,
                 minHeight: ABOUT_BLOCK_H,
+                borderColor: "var(--rule)",
               }}
             >
-              <div className="grid grid-cols-1 gap-10 sm:grid-cols-[1fr_auto] xl:grid-cols-[1fr_auto_1fr]">
-                <div className="max-w-[42ch]">
+              <div className="grid grid-cols-1 gap-10 pt-10 sm:grid-cols-[1fr_1fr] xl:grid-cols-[1fr_1fr_1fr]">
+                <div
+                  className="max-w-[42ch] sm:border-r sm:pr-10"
+                  style={{ borderColor: "var(--rule)" }}
+                >
                   {leading(null)}
                   <p className={`mt-8 sm:mt-10 ${PROSE}`}>{ABOUT_PLACEHOLDER[0]}</p>
                 </div>
 
-                {/* Capped at the height of the block it is centred in, and a share of
-                    the window below that, so it gives way to the prose on a narrow
-                    window the way the Experience photograph does. */}
+                {/* Fills its column instead of sitting in a fixed small
+                    square: this is the wireframe's centre block. The
+                    diagonal hachure is drawn over the portrait rather than
+                    replacing it — it reads as a placeholder-image treatment
+                    even though the picture behind it is real. */}
                 <div
-                  className="hidden items-center justify-center sm:flex"
-                  style={{ height: BLOCK_H }}
+                  className="relative hidden aspect-square self-start sm:block xl:border-r xl:pr-10"
+                  style={{ borderColor: "var(--rule)", maxHeight: "min(38vh, 28vw)" }}
                 >
+                  <Image
+                    src={portrait}
+                    alt="Portrait de Marie Vachelard, en noir et blanc"
+                    fill
+                    sizes="33vw"
+                    placeholder="blur"
+                    className="object-cover"
+                  />
                   <div
-                    className="relative aspect-square"
-                    style={{ width: `min(26vw, ${BLOCK_H}px)` }}
-                  >
-                    <Image
-                      src={portrait}
-                      alt="Portrait de Marie Vachelard, en noir et blanc"
-                      fill
-                      sizes="26vw"
-                      placeholder="blur"
-                      className="object-cover"
-                    />
-                  </div>
+                    aria-hidden
+                    className="absolute inset-0"
+                    style={{
+                      backgroundImage:
+                        "repeating-linear-gradient(45deg, var(--rule) 0, var(--rule) 1px, transparent 1px, transparent 10px)",
+                    }}
+                  />
                 </div>
 
-                {/* Pushed to its own right edge rather than left in the middle of the
-                    column, so the arrangement closes on the page's right margin and the
-                    two blocks sit at equal distance from the portrait. It reaches
-                    further right than the Experience photograph does, which is the cost
-                    of a truly centred portrait: the margins have to match, and the
-                    photograph's do not. */}
                 <div className="ml-auto hidden max-w-[42ch] xl:block">
                   {leading(null)}
                   <p className={`mt-8 sm:mt-10 ${PROSE}`}>{ABOUT_PLACEHOLDER[1]}</p>
                 </div>
               </div>
 
-              {/* Where all of this is written from, as a pair of coordinates rather than
-                  as the name of the place. It closes the section, so it goes to the foot
-                  of the page — on the line the four column titles rest on — and it gets
-                  there by an auto margin rather than by being pinned, so it is still the
-                  last thing in the block's own flow: it rises with the block and leaves
-                  with it.
-
-                  `pt-10` is the floor under that margin. On a window with room to spare
-                  the margin does the work and the padding is invisible; on one without, the
-                  margin collapses to nothing and the padding is all that keeps the mark off
-                  the prose above it.
-
-                  Centred by `text-center` on the page rather than merely between its
-                  neighbours, and for the same reason the portrait above it is — the
-                  insets of the container these sit in are equal, so its middle is the
-                  window's middle. The anchor is inline-grid, which is an inline-level box
-                  and so is what `text-center` centres. */}
-              <p className="mt-auto pt-10 text-center">
+              <p
+                className="mt-auto border-t pt-10 text-center"
+                style={{ borderColor: "var(--rule)" }}
+              >
                 {mark({
                   href: "https://www.toulouse-tourisme.com/",
                   label: "N 43.60079° / E 1.35044°",
