@@ -69,17 +69,18 @@ export function SpecSheetGrid({
         style={{ borderColor: "var(--rule)" }}
       />
 
-      {/* Same idea, horizontally: one line just above the title, at the title
-          container's own top inset (top-36/sm:top-48 in SpecSheetColumns.tsx),
-          and one just below the coordinates, at the FOOT inset (48px, `bottom-12`
-          here — the same figure as the page's own `pb-12`) the content block is
-          sized to land its last line on. */}
+      {/* Same idea, horizontally, and the same top-5/sm:top-10 figure as the
+          verticals above — all four margins read as one uniform frame around
+          the page, not a wider gap on one side than another. This sits well
+          above the title itself, which keeps its own top-36/sm:top-48 in
+          SpecSheetColumns.tsx; the gap between this line and the title is not
+          the margin, it is the title row's own height. */}
       <div
-        className="absolute inset-x-0 top-36 border-t sm:top-48"
+        className="absolute inset-x-0 top-5 border-t sm:top-10"
         style={{ borderColor: "var(--rule)" }}
       />
       <div
-        className="absolute inset-x-0 bottom-12 border-t"
+        className="absolute inset-x-0 bottom-5 border-t sm:bottom-10"
         style={{ borderColor: "var(--rule)" }}
       />
     </div>
