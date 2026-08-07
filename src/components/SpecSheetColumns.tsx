@@ -1230,7 +1230,12 @@ export function SpecSheetColumns() {
           the cube is its own affordance, this is only the hit area over it, live
           once it has landed so its flight cannot be cut short half way.
           It is also what tells the cube it is being looked at: the tumble is the only
-          sign this area is live, since there is nothing here to highlight. */}
+          sign this area is live, since there is nothing here to highlight.
+
+          Centred on `dock.x`/`dock.y` rather than pinned to the corner: the cube's
+          own dock position now follows the title's line (see specSheetBlobRenderer's
+          dockGeometry), not a fixed inset, so the hit area has to follow it too or
+          it drifts off the cube exactly the way it just did. */}
       <button
         type="button"
         onClick={close}
@@ -1240,8 +1245,13 @@ export function SpecSheetColumns() {
         // No cursor-pointer: a hand here would swap the dot out for an arrow and read
         // as the custom cursor breaking. What this area is is announced by the cube
         // turning and by [ CLOSE ] appearing, which say more than a hand would.
-        className="absolute right-0 top-0 h-40 w-40"
-        style={{ pointerEvents: settled ? "auto" : "none" }}
+        className="absolute h-40 w-40"
+        style={{
+          left: dock.x,
+          top: dock.y,
+          transform: "translate(-50%, -50%)",
+          pointerEvents: settled ? "auto" : "none",
+        }}
       />
 
       {/* Named only while the pointer is on it. Placed off the cube's own parked
