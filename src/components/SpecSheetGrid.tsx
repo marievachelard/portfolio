@@ -46,6 +46,20 @@ export function SpecSheetGrid({
         className="absolute inset-y-0 right-5 border-r sm:right-10"
         style={{ borderColor: "var(--rule)" }}
       />
+
+      {/* Same idea, horizontally: one line just above the title, at the title
+          container's own top inset (top-36/sm:top-48 in SpecSheetColumns.tsx),
+          and one just below the coordinates, at the FOOT inset (48px, `bottom-12`
+          here — the same figure as the page's own `pb-12`) the content block is
+          sized to land its last line on. */}
+      <div
+        className="absolute inset-x-0 top-36 border-t sm:top-48"
+        style={{ borderColor: "var(--rule)" }}
+      />
+      <div
+        className="absolute inset-x-0 bottom-12 border-t"
+        style={{ borderColor: "var(--rule)" }}
+      />
     </div>
   );
 }
