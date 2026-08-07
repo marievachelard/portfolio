@@ -17,7 +17,14 @@ import poolside from "@/images/experience/rooftop-pool-palms.jpg";
 import stage from "@/images/experience/open-air-stage.jpg";
 import dome from "@/images/experience/toulouse-garonne-dome.jpg";
 import portrait from "@/images/about/marie-vachelard.jpg";
-import { SpecSheetGrid } from "@/components/SpecSheetGrid";
+import { SpecSheetAboutGrid } from "@/components/SpecSheetAboutGrid";
+import { SpecSheetDevPanel } from "@/components/SpecSheetDevPanel";
+import {
+  DEFAULT_DEV_PANEL_VALUES,
+  loadDevPanelValues,
+  saveDevPanelValues,
+  type DevPanelValues,
+} from "@/lib/specSheetDevPanelValues";
 import shopfront from "@/images/projects/shop-window-paintings.jpg";
 import ridge from "@/images/projects/mountain-ridge-hiker.jpg";
 
@@ -337,26 +344,9 @@ const MEASURE_END = "calc(5rem + min(48ch, 44vw))";
  * placed on this line lands where those words were, rather than at some distance of its
  * own choosing.
  */
-const FOOT = 48;
-
-/**
- * The height About's block is given so its last line can sit on that foot: everything
- * above the block, plus the foot itself, taken off the window.
- *
- * Its last line is pushed there by an auto margin rather than pinned by `position`, which
- * is the difference between a mark at the bottom of this section and a mark stuck to the
- * corner of the page. It still belongs to the block — it rises with it, leaves with it,
- * and if the window is too short for the room this asks for, the margin collapses and the
- * prose keeps its space.
- *
- * The figures above the block are the sm ones, as everywhere else here. Below that
- * breakpoint the title is smaller and the gap narrower, so the mark comes to rest a little
- * lower than the foot rather than on it — a few pixels, at the width where the portrait
- * and the second column are gone anyway.
- */
-const ABOUT_BLOCK_H = `calc(100dvh - ${
-  TITLE_TOP + TITLE_LINE + BLOCK_GAP + FOOT
-}px)`;
+// FOOT and the About block's own height calc (ABOUT_BLOCK_H) are gone: the unified
+// SpecSheetAboutGrid now sizes the legend row from its own row tracks (marginBottom,
+// the `1fr` content row) rather than a calc() derived from these constants.
 
 /**
  * The two lines above a summary: an entry's name, and its dates.
@@ -490,6 +480,21 @@ export function SpecSheetColumns() {
   // `paint` below for why that is the one place it can.
   const [textIndex, setTextIndex] = useState(0);
   const mainRef = useRef<HTMLElement>(null);
+  // The dev panel's own tunable values, driving the About spec-sheet grid. Seeded from
+  // localStorage lazily (window isn't available during SSR), and re-saved on every
+  // change so a reload keeps whatever the sliders were last set to.
+  const [devPanelValues, setDevPanelValues] = useState<DevPanelValues>(
+    DEFAULT_DEV_PANEL_VALUES,
+  );
+  useEffect(() => {
+    // Deliberate: reading localStorage during the lazy useState initializer would run
+    // on both the server (SSR) and the client's first render, and disagree — the
+    // effect's whole job is to synchronize this component's state with that external
+    // store strictly after mount, which is exactly what the lint rule is warning
+    // about missing in cases that don't actually need it. This one does.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setDevPanelValues(loadDevPanelValues());
+  }, []);
 
   /**
    * The open section's entries, or null if it has none. Everything that used to name
@@ -664,6 +669,11 @@ export function SpecSheetColumns() {
       renderer.current = null;
     };
   }, []);
+
+  const handleDevPanelChange = (next: DevPanelValues) => {
+    setDevPanelValues(next);
+    saveDevPanelValues(next);
+  };
 
   const hoverCube = (on: boolean) => {
     setCubeHovered(on);
@@ -950,18 +960,62 @@ export function SpecSheetColumns() {
           has to be centred on the window for the two to be the same point. An earlier
           version carried the Experience photograph's `lg:right-40` here, and the
           portrait came out 60px left of centre because of it. */}
-      {/* SpecSheetGrid's left-10/right-10 (sm:left-20/right-20) insets must match the
-          title container's below, or the frame drifts from its content. Both were
-          moved out from left-5/right-5 (sm:left-10/right-10) together, for a bigger
-          margin — MEASURE_END and the photo strip's own `right-20` below move with
-          it, since all three describe the same gutter. */}
+      {/* About, "spec sheet" layout: one unified CSS grid (SpecSheetAboutGrid) owns
+          every margin, rule, and content cell — see
+          docs/superpowers/specs/2026-08-07-about-lab-unified-grid-design.md. Mounted
+          as a sibling of the title container below (not nested inside it): it is
+          `position: absolute; inset: 0`, sized against `<main>`, and the title
+          container's own box has no fixed height for it to size against instead. */}
       {opened !== null && COLUMNS[opened] === "About" && (
-        <SpecSheetGrid closing={closing} restAt={restAt} />
+        <SpecSheetAboutGrid
+          closing={closing}
+          restAt={restAt}
+          values={devPanelValues}
+          prose1={
+            <>
+              {leading(null)}
+              <p className={`mt-8 sm:mt-10 ${PROSE}`}>{ABOUT_PLACEHOLDER[0]}</p>
+            </>
+          }
+          image={
+            <Image
+              src={portrait}
+              alt="Portrait de Marie Vachelard, en noir et blanc"
+              fill
+              sizes="33vw"
+              placeholder="blur"
+              className="object-cover"
+            />
+          }
+          prose2={
+            <>
+              {leading(null)}
+              <p className={`mt-8 sm:mt-10 ${PROSE}`}>{ABOUT_PLACEHOLDER[1]}</p>
+            </>
+          }
+          legend={mark({
+            href: "https://www.toulouse-tourisme.com/",
+            label: "N 43.60079° / E 1.35044°",
+            settled,
+            centred: true,
+          })}
+        />
       )}
 
+      {/* The title container's left/right/top now come from the dev panel's values
+          (marginLeft/marginRight/titleTop) rather than static classes, applied at
+          every width for now — see SpecSheetDevPanel. MEASURE_END and the photo
+          strip's own `right-20` below are not wired to these values; they drift out
+          of sync if the panel's margins change, same as the dev-panel spec already
+          calls out as a known, accepted gap. */}
       <div
         aria-hidden={!settled}
-        className="pointer-events-none absolute left-10 right-10 top-36 sm:left-20 sm:right-20 sm:top-48"
+        className="pointer-events-none absolute"
+        style={{
+          left: devPanelValues.marginLeft,
+          right: devPanelValues.marginRight,
+          top: devPanelValues.titleTop,
+        }}
       >
         {/* Each letter owns both its arriving and its leaving, on its own delay —
             forwards from the first on the way in, backwards from the last on the way
@@ -1052,103 +1106,6 @@ export function SpecSheetColumns() {
                 </p>
               )}
             </article>
-            </div>
-          </div>
-        )}
-
-        {/* About, "spec sheet" layout: three equal columns (prose, portrait,
-            prose) inside a ruled frame (SpecSheetGrid, mounted just outside
-            this title container). The horizontal rules — under the title,
-            and above the coordinates — are borders on this block's own
-            wrapper and on the legend paragraph, so they always span exactly
-            the same width as the frame around them, whatever the content's
-            height turns out to be. */}
-        {opened !== null && COLUMNS[opened] === "About" && (
-          <div className="mt-2 sm:mt-3" style={{ minHeight: BLOCK_H }}>
-            {/* A full-bleed rule rather than a border on the wrapper below: the
-                wrapper keeps the title container's left-10/right-20 inset, but the
-                line itself has to reach the page's true edges to match
-                SpecSheetGrid's now edge-to-edge frame. `left: 50%` plus a
-                negative `-50vw` margin is the standard full-bleed break-out — it
-                only touches the horizontal axis, so the line still lands at
-                exactly this point in the vertical flow. */}
-            <div
-              aria-hidden
-              className={`${closing ? "depart" : "arrive"} pointer-events-none relative w-screen border-t`}
-              style={{
-                animationDelay: closing ? "0ms" : `${restAt}ms`,
-                left: "50%",
-                marginLeft: "-50vw",
-                borderColor: "var(--rule)",
-              }}
-            />
-            {/* A second rule: the wireframe's title row and content row are not simply
-                back to back — there is a thin row of its own between them, and this
-                is it. Its own distance from the title holds steady at 56px/72px
-                (sm) total — the first rule above has moved twice now, each time
-                closer to the title, and each time this rule's own gap grew by
-                the same amount so its position never moved. Same full-bleed
-                break-out. */}
-            <div
-              aria-hidden
-              className={`${closing ? "depart" : "arrive"} pointer-events-none relative mt-12 w-screen border-t sm:mt-[60px]`}
-              style={{
-                animationDelay: closing ? "0ms" : `${restAt}ms`,
-                left: "50%",
-                marginLeft: "-50vw",
-                borderColor: "var(--rule)",
-              }}
-            />
-            <div
-              className={`${closing ? "depart" : "arrive"} flex flex-col`}
-              style={{
-                animationDelay: closing ? "0ms" : `${restAt}ms`,
-                minHeight: ABOUT_BLOCK_H,
-              }}
-            >
-              <div className="grid grid-cols-1 gap-10 pt-10 sm:grid-cols-[1fr_1fr] xl:grid-cols-[1fr_1fr_1fr]">
-                <div className="max-w-[42ch] sm:pr-10">
-                  {leading(null)}
-                  <p className={`mt-8 sm:mt-10 ${PROSE}`}>{ABOUT_PLACEHOLDER[0]}</p>
-                </div>
-
-                {/* Fills its column instead of sitting in a fixed small square:
-                    this is the wireframe's centre block. No `self-start` and no
-                    fixed aspect ratio — the default grid stretch is what lets it
-                    fill the cell, so its height follows whichever prose column
-                    beside it is tallest rather than a size of its own. */}
-                <div className="relative hidden sm:block xl:pr-10">
-                  <Image
-                    src={portrait}
-                    alt="Portrait de Marie Vachelard, en noir et blanc"
-                    fill
-                    sizes="33vw"
-                    placeholder="blur"
-                    className="object-cover"
-                  />
-                </div>
-
-                <div className="ml-auto hidden max-w-[42ch] xl:block">
-                  {leading(null)}
-                  <p className={`mt-8 sm:mt-10 ${PROSE}`}>{ABOUT_PLACEHOLDER[1]}</p>
-                </div>
-              </div>
-
-              {/* Same full-bleed break-out as the rule above the prose columns —
-                  see the comment there. */}
-              <div
-                aria-hidden
-                className="pointer-events-none relative mt-auto w-screen border-t"
-                style={{ left: "50%", marginLeft: "-50vw", borderColor: "var(--rule)" }}
-              />
-              <p className="pt-10 text-center">
-                {mark({
-                  href: "https://www.toulouse-tourisme.com/",
-                  label: "N 43.60079° / E 1.35044°",
-                  settled,
-                  centred: true,
-                })}
-              </p>
             </div>
           </div>
         )}
@@ -1301,6 +1258,8 @@ export function SpecSheetColumns() {
       >
         [ CLOSE ]
       </span>
+
+      <SpecSheetDevPanel values={devPanelValues} onChange={handleDevPanelChange} />
     </main>
   );
 }
