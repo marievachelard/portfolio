@@ -4,13 +4,27 @@
  * horizontal title/content and content/legend rules are borders on the
  * content itself (see SpecSheetColumns.tsx), so every rule shares the same
  * width without this component having to know the content's exact height.
+ *
+ * `closing` and `restAt` give the frame the same open/close choreography as
+ * everything else in the section — see the `arrive`/`depart` classes on the
+ * title/content wrapper in SpecSheetColumns.tsx, which this mirrors, so the
+ * frame appears and disappears on the same timed beats rather than snapping.
  */
-export function SpecSheetGrid() {
+export function SpecSheetGrid({
+  closing,
+  restAt,
+}: {
+  closing: boolean;
+  restAt: number;
+}) {
   return (
     <div
       aria-hidden
-      className="pointer-events-none absolute left-5 right-5 top-24 bottom-6 sm:left-10 sm:right-10 sm:top-28 sm:bottom-8"
-      style={{ border: "1px solid var(--rule)" }}
+      className={`${closing ? "depart" : "arrive"} pointer-events-none absolute left-5 right-5 top-24 bottom-6 sm:left-10 sm:right-10 sm:top-28 sm:bottom-8`}
+      style={{
+        border: "1px solid var(--rule)",
+        animationDelay: closing ? "0ms" : `${restAt}ms`,
+      }}
     >
       <div className="grid h-full grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
         <div />

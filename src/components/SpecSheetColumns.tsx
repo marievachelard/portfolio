@@ -950,6 +950,12 @@ export function SpecSheetColumns() {
           has to be centred on the window for the two to be the same point. An earlier
           version carried the Experience photograph's `lg:right-40` here, and the
           portrait came out 60px left of centre because of it. */}
+      {/* SpecSheetGrid's left-5/right-5 (sm:left-10/right-10) insets must match the
+          title container's below, or the frame drifts from its content. */}
+      {opened !== null && COLUMNS[opened] === "About" && (
+        <SpecSheetGrid closing={closing} restAt={restAt} />
+      )}
+
       <div
         aria-hidden={!settled}
         className="pointer-events-none absolute left-5 right-5 top-36 sm:left-10 sm:right-10 sm:top-48"
@@ -1066,7 +1072,7 @@ export function SpecSheetColumns() {
             >
               <div className="grid grid-cols-1 gap-10 pt-10 sm:grid-cols-[1fr_1fr] xl:grid-cols-[1fr_1fr_1fr]">
                 <div
-                  className="max-w-[42ch] sm:border-r sm:pr-10"
+                  className="max-w-[42ch] sm:pr-10"
                   style={{ borderColor: "var(--rule)" }}
                 >
                   {leading(null)}
@@ -1079,7 +1085,7 @@ export function SpecSheetColumns() {
                     replacing it — it reads as a placeholder-image treatment
                     even though the picture behind it is real. */}
                 <div
-                  className="relative hidden aspect-square self-start sm:block xl:border-r xl:pr-10"
+                  className="relative hidden aspect-square self-start sm:block xl:pr-10"
                   style={{ borderColor: "var(--rule)", maxHeight: "min(38vh, 28vw)" }}
                 >
                   <Image
@@ -1152,8 +1158,6 @@ export function SpecSheetColumns() {
           </div>
         )}
       </div>
-
-      {opened !== null && COLUMNS[opened] === "About" && <SpecSheetGrid />}
 
       {/* The entry's image, opposite its text: the left half reads, the right half
           looks. Vertically centred rather than pinned to the title, which keeps it
