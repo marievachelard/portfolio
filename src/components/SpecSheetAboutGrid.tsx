@@ -107,9 +107,22 @@ export function SpecSheetAboutGrid({
         <div style={{ gridColumn: "b2 / b3", gridRow: "r8 / r9", width: "100%", padding: "0 8px" }}>
           {prose1}
         </div>
+        {/* The image spans into the padding tracks on every side it has one, touching
+            the surrounding rules directly instead of stopping at the narrower content
+            track — "fills the cell" means the area between the rules, not just the
+            1fr track inside it. Two variants: two-column mode's image already touches
+            the outer right margin line directly (no padding track past it, by design
+            — see the doubled-pair comment above), so only its left side gains the
+            extra span; three-column mode gains it on both sides. */}
         <div
-          className="relative hidden sm:block"
-          style={{ gridColumn: "b8 / b9", gridRow: "r8 / r9" }}
+          className="relative hidden sm:block xl:hidden"
+          style={{ gridColumn: "b7 / b9", gridRow: "r7 / r10" }}
+        >
+          {image}
+        </div>
+        <div
+          className="relative hidden xl:block"
+          style={{ gridColumn: "b7 / b10", gridRow: "r7 / r10" }}
         >
           {image}
         </div>
