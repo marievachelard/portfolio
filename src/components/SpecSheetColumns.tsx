@@ -1079,6 +1079,19 @@ export function SpecSheetColumns() {
                 borderColor: "var(--rule)",
               }}
             />
+            {/* A second rule, a beat below the first: the wireframe's title row and
+                content row are not simply back to back — there is a thin row of
+                its own between them, and this is it. Same full-bleed break-out. */}
+            <div
+              aria-hidden
+              className={`${closing ? "depart" : "arrive"} pointer-events-none relative mt-6 w-screen border-t`}
+              style={{
+                animationDelay: closing ? "0ms" : `${restAt}ms`,
+                left: "50%",
+                marginLeft: "-50vw",
+                borderColor: "var(--rule)",
+              }}
+            />
             <div
               className={`${closing ? "depart" : "arrive"} flex flex-col`}
               style={{
