@@ -126,9 +126,17 @@ export function SpecSheetAboutGrid({
         >
           {image}
         </div>
+        {/* b13 / b15, not b14 / b15: prose1 sits directly against its own nearest
+            visible line (lineL, no padding track between them), so its 8px padding
+            reads as "8px from the line." Prose2's nearest visible line (lineB2) has
+            the halfGap padding track (b13/b14) between it and prose2's own b14/b15
+            cell — left as b14/b15, the 8px padding would start counting from that
+            invisible boundary, landing the text ~28px from the line instead of 8.
+            Spanning from b13 folds the halfGap into this box so the padding is
+            measured from the same place prose1's is: the visible line itself. */}
         <div
           className="hidden xl:block"
-          style={{ gridColumn: "b14 / b15", gridRow: "r8 / r9", width: "100%", padding: "0 8px" }}
+          style={{ gridColumn: "b13 / b15", gridRow: "r8 / r9", width: "100%", padding: "0 8px" }}
         >
           {prose2}
         </div>
