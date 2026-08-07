@@ -1262,7 +1262,7 @@ export function SpecSheetColumns() {
         // No cursor-pointer: a hand here would swap the dot out for an arrow and read
         // as the custom cursor breaking. What this area is is announced by the cube
         // turning and by [ CLOSE ] appearing, which say more than a hand would.
-        className="absolute left-0 top-0 h-40 w-40"
+        className="absolute right-0 top-0 h-40 w-40"
         style={{ pointerEvents: settled ? "auto" : "none" }}
       />
 

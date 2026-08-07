@@ -115,7 +115,9 @@ export function dockGeometry(cssW: number, cssH: number) {
     reach + 14,
     Math.min(DOCK_INSET, cssW * 0.16, cssH * 0.16),
   );
-  return { x: inset, y: inset, unit, reach };
+  // Docks top-right on this page instead of top-left — everything else about
+  // the geometry (unit, reach, vertical inset) is unchanged.
+  return { x: cssW - inset, y: inset, unit, reach };
 }
 
 function compile(gl: WebGL2RenderingContext, type: number, src: string) {
