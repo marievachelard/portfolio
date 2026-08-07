@@ -923,7 +923,7 @@ export function LiquidColumns() {
                 className="transition-opacity duration-300"
                 style={{ opacity: opened === i ? 0 : 1 }}
               >
-                <h2 className="text-sm font-medium tracking-tight text-neutral-900 sm:text-xl md:text-2xl">
+                <h2 className="text-4xl font-medium tracking-tight text-neutral-900 sm:text-6xl">
                   {label}
                 </h2>
               </div>
