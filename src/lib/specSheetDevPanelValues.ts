@@ -18,10 +18,10 @@ export const DEFAULT_DEV_PANEL_VALUES: DevPanelValues = {
   marginRight: 80,
   titleToRule1: 12,
   rule1ToRule2: 60,
-  imageFlankGap: 10,
-  proseWidth: 42,
+  imageFlankGap: 32,
+  proseWidth: 40,
   columnGap: 40,
-  titleTop: 192,
+  titleTop: 120,
 };
 
 const STORAGE_KEY = "about-lab-dev-panel";
