@@ -32,6 +32,28 @@ export function SpecSheetGrid({
         <div className="hidden border-l xl:block" style={{ borderColor: "var(--rule)" }} />
       </div>
 
+      {/* A second, closely-spaced line either side of the column boundaries the
+          portrait sits behind — the same doubled-rule motif as the pair above the
+          title, just vertical. The column boundary is at 50% in two-column mode
+          (`sm` to just under `xl`) and at 1/3 and 2/3 in three-column mode (`xl`
+          and up), so each needs its own element rather than one continuous line:
+          the offset from 50% flips to an offset from 1/3 once the third column
+          appears. There is no "after the image" line below `xl` — the portrait
+          is the last column there, with only the frame's own right margin past
+          it, not a divider to double. */}
+      <div
+        className="absolute inset-y-0 hidden border-l sm:block xl:hidden"
+        style={{ left: "calc(50% + 10px)", borderColor: "var(--rule)" }}
+      />
+      <div
+        className="absolute inset-y-0 hidden border-l xl:block"
+        style={{ left: "calc(33.333% + 10px)", borderColor: "var(--rule)" }}
+      />
+      <div
+        className="absolute inset-y-0 hidden border-l xl:block"
+        style={{ left: "calc(66.666% - 10px)", borderColor: "var(--rule)" }}
+      />
+
       {/* Two more verticals, one on each side, sitting exactly where the content's
           own left/right inset falls — left-5/right-5 (sm:left-10/right-10) is the
           title container's own inset in SpecSheetColumns.tsx. These mark the margin
