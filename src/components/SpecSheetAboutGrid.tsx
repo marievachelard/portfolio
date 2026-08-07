@@ -92,13 +92,13 @@ export function SpecSheetAboutGrid({
         {/* Doubled pair flanking the portrait's left edge — visible from `sm`, where
             b4/b5 and b6/b7 both exist and mean the same thing in the sm and xl
             templates (they diverge only after the portrait). */}
-        <div className="hidden sm:block" style={{ ...RULE, gridColumn: "b4 / b5", gridRow: "r8 / r9" }} />
-        <div className="hidden sm:block" style={{ ...RULE, gridColumn: "b6 / b7", gridRow: "r8 / r9" }} />
+        <div className="hidden sm:block" style={{ ...RULE, gridColumn: "b4 / b5", gridRow: "1 / -1" }} />
+        <div className="hidden sm:block" style={{ ...RULE, gridColumn: "b6 / b7", gridRow: "1 / -1" }} />
 
         {/* Doubled pair flanking the portrait's right edge — only exists once the
             third column appears, at `xl`. */}
-        <div className="hidden xl:block" style={{ ...RULE, gridColumn: "b10 / b11", gridRow: "r8 / r9" }} />
-        <div className="hidden xl:block" style={{ ...RULE, gridColumn: "b12 / b13", gridRow: "r8 / r9" }} />
+        <div className="hidden xl:block" style={{ ...RULE, gridColumn: "b10 / b11", gridRow: "1 / -1" }} />
+        <div className="hidden xl:block" style={{ ...RULE, gridColumn: "b12 / b13", gridRow: "1 / -1" }} />
 
         {/* Content. Each column reference is valid at every breakpoint it's actually
             shown at — prose1 and the portrait share the same b2/b3 and b8/b9 pair in
