@@ -825,6 +825,13 @@ export function SpecSheetColumns() {
   /** When the last letter of the title has landed, and when the rest follows it. */
   const typedAt = TYPE_START + Math.max(0, label.length - 1) * TYPE_STEP;
   const restAt = typedAt + REST_GAP;
+  // The same figure SpecSheetAboutGrid computes for its own "titleSpace" track — the
+  // reserved row between the margin line and the first rule under the title. Centring
+  // the title in exactly this height, rather than pinning it to a top offset, is what
+  // "Title top" now actually moves: not the title's own position, but how much of this
+  // row is above it versus below.
+  const titleSpace =
+    devPanelValues.titleTop + TITLE_LINE - devPanelValues.marginTop - 1;
 
   /** The aside on the title's own baseline. A list says which entry of how many; About
       introduces the person whose page this is, and Contact invites the reason for being
@@ -1002,56 +1009,73 @@ export function SpecSheetColumns() {
         />
       )}
 
-      {/* The title container's left/right/top now come from the dev panel's values
-          (marginLeft/marginRight/titleTop) rather than static classes, applied at
-          every width for now — see SpecSheetDevPanel. MEASURE_END and the photo
-          strip's own `right-20` below are not wired to these values; they drift out
-          of sync if the panel's margins change, same as the dev-panel spec already
-          calls out as a known, accepted gap. */}
+      {/* The title container's left/right now come from the dev panel's values
+          (marginLeft/marginRight) rather than static classes, applied at every width
+          for now — see SpecSheetDevPanel. Its own top is pinned right after the top
+          margin line (marginTop + 1) rather than at titleTop directly — the title row
+          just inside it (below) is what titleTop now positions, by centring within
+          titleSpace. MEASURE_END and the photo strip's own `right-20` below are not
+          wired to these values; they drift out of sync if the panel's margins change,
+          same as the dev-panel spec already calls out as a known, accepted gap. */}
       <div
         aria-hidden={!settled}
         className="pointer-events-none absolute"
         style={{
           left: devPanelValues.marginLeft,
           right: devPanelValues.marginRight,
-          top: devPanelValues.titleTop,
+          top: devPanelValues.marginTop + 1,
         }}
       >
-        {/* Each letter owns both its arriving and its leaving, on its own delay —
-            forwards from the first on the way in, backwards from the last on the way
-            out. Animations rather than transitions, because these mount and unmount
-            with the section and a transition has nothing to start from. */}
-        <div className="flex items-baseline gap-3 sm:gap-4">
-          <h1 className="text-4xl font-medium tracking-tight text-neutral-900 sm:text-6xl">
-            {label.split("").map((letter, i) => (
+        {/* Width 100%, an 8px inline padding, and vertical centring in titleSpace —
+            the same treatment the prose columns got, applied to the title row below.
+            A separate wrapper from that row itself: the row's own flex (items-baseline)
+            aligns the h1 and the aside on one baseline, which `alignItems: center`
+            here must not override — the two flex containers do different jobs. */}
+        <div
+          style={{
+            width: "100%",
+            height: titleSpace,
+            padding: "0 8px",
+            display: "flex",
+            alignItems: "center",
+          }}
+        >
+          {/* Each letter owns both its arriving and its leaving, on its own delay —
+              forwards from the first on the way in, backwards from the last on the way
+              out. Animations rather than transitions, because these mount and unmount
+              with the section and a transition has nothing to start from. */}
+          <div className="flex items-baseline gap-3 sm:gap-4">
+            <h1 className="text-4xl font-medium tracking-tight text-neutral-900 sm:text-6xl">
+              {label.split("").map((letter, i) => (
+                <span
+                  key={i}
+                  className={closing ? "type-out" : "type-in"}
+                  style={{
+                    animationDelay: closing
+                      ? `${UNTYPE_START + (label.length - 1 - i) * UNTYPE_STEP}ms`
+                      : `${TYPE_START + i * TYPE_STEP}ms`,
+                  }}
+                >
+                  {letter}
+                </span>
+              ))}
+            </h1>
+            {/* Sits on the title's own baseline, so it reads as an annotation to it
+                rather than as a second line. */}
+            {aside && (
               <span
-                key={i}
-                className={closing ? "type-out" : "type-in"}
-                style={{
-                  animationDelay: closing
-                    ? `${UNTYPE_START + (label.length - 1 - i) * UNTYPE_STEP}ms`
-                    : `${TYPE_START + i * TYPE_STEP}ms`,
-                }}
+                className={`${
+                  closing ? "type-out" : "type-in"
+                } whitespace-nowrap font-mono text-[10px] tracking-[0.2em] text-neutral-400 sm:text-xs`}
+                // Lands as the last letter does, and leaves before the first of them:
+                // it annotates the line, so it comes and goes with the line rather than
+                // with the block.
+                style={{ animationDelay: closing ? "0ms" : `${typedAt}ms` }}
               >
-                {letter}
+                {aside}
               </span>
-            ))}
-          </h1>
-          {/* Sits on the title's own baseline, so it reads as an annotation to it
-              rather than as a second line. */}
-          {aside && (
-            <span
-              className={`${
-                closing ? "type-out" : "type-in"
-              } whitespace-nowrap font-mono text-[10px] tracking-[0.2em] text-neutral-400 sm:text-xs`}
-              // Lands as the last letter does, and leaves before the first of them:
-              // it annotates the line, so it comes and goes with the line rather than
-              // with the block.
-              style={{ animationDelay: closing ? "0ms" : `${typedAt}ms` }}
-            >
-              {aside}
-            </span>
-          )}
+            )}
+          </div>
         </div>
 
         {/* Only the section that has entries gets them. Everything shares the
