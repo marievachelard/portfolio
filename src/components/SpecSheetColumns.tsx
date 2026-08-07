@@ -17,6 +17,7 @@ import poolside from "@/images/experience/rooftop-pool-palms.jpg";
 import stage from "@/images/experience/open-air-stage.jpg";
 import dome from "@/images/experience/toulouse-garonne-dome.jpg";
 import portrait from "@/images/about/marie-vachelard.jpg";
+import { SpecSheetGrid } from "@/components/SpecSheetGrid";
 import shopfront from "@/images/projects/shop-window-paintings.jpg";
 import ridge from "@/images/projects/mountain-ridge-hiker.jpg";
 
@@ -1186,6 +1187,8 @@ export function SpecSheetColumns() {
           </div>
         )}
       </div>
+
+      {opened !== null && COLUMNS[opened] === "About" && <SpecSheetGrid />}
 
       {/* The entry's image, opposite its text: the left half reads, the right half
           looks. Vertically centred rather than pinned to the title, which keeps it
