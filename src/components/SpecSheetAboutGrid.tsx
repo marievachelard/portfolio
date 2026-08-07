@@ -134,11 +134,16 @@ export function SpecSheetAboutGrid({
         </div>
         {/* Centred on both axes within its cell — full width, flexed rather than
             text-align, so the vertical centring (align-items) and the horizontal
-            (justify-content) come from the same mechanism. */}
+            (justify-content) come from the same mechanism. Spans r10/r12, not just
+            r11/r12 (the legend's own auto-height row): r10/r11 is the columnGap
+            padding between the rule above (lineC, ending at r10) and this row, and
+            leaving it out of the centred box is what put the text low, flush against
+            its own row's bottom instead of centred in the visible gap between the
+            two rules. */}
         <div
           style={{
             gridColumn: "1 / -1",
-            gridRow: "r11 / r12",
+            gridRow: "r10 / r12",
             width: "100%",
             display: "flex",
             alignItems: "center",
