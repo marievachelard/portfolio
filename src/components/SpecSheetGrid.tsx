@@ -31,6 +31,21 @@ export function SpecSheetGrid({
         <div className="hidden border-l sm:block" style={{ borderColor: "var(--rule)" }} />
         <div className="hidden border-l xl:block" style={{ borderColor: "var(--rule)" }} />
       </div>
+
+      {/* Two more verticals, one on each side, sitting exactly where the content's
+          own left/right inset falls — left-5/right-5 (sm:left-10/right-10) is the
+          title container's own inset in SpecSheetColumns.tsx. These mark the margin
+          between the page edge and the content, the way the wireframe's outer
+          margin columns do, distinct from the frame's own edge-to-edge rectangle
+          above and the column dividers between prose/portrait/prose. */}
+      <div
+        className="absolute inset-y-0 left-5 border-l sm:left-10"
+        style={{ borderColor: "var(--rule)" }}
+      />
+      <div
+        className="absolute inset-y-0 right-5 border-r sm:right-10"
+        style={{ borderColor: "var(--rule)" }}
+      />
     </div>
   );
 }
