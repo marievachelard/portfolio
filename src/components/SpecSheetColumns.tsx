@@ -314,7 +314,7 @@ const IMAGE_SIZES = "(min-width: 1231px) 320px, 26vw";
 
 /**
  * Where the measure ends, and so where the half of the line the photograph has to itself
- * begins: the columns' own `left-10` gutter plus the width the prose is held to.
+ * begins: the columns' own `left-20` gutter plus the width the prose is held to.
  *
  * The photograph used to be pinned a fixed 160px in from the right edge, put there to
  * keep it nearer the text than the frame. A fixed number cannot do that: how much white
@@ -329,7 +329,7 @@ const IMAGE_SIZES = "(min-width: 1231px) 320px, 26vw";
  * inherited 16px, the prose only dropping to `text-sm` below `sm`, where the photograph
  * is not shown at all.
  */
-const MEASURE_END = "calc(2.5rem + min(48ch, 44vw))";
+const MEASURE_END = "calc(5rem + min(48ch, 44vw))";
 
 /**
  * How far the foot of the page sits above the bottom edge. It is the columns' own
@@ -950,15 +950,18 @@ export function SpecSheetColumns() {
           has to be centred on the window for the two to be the same point. An earlier
           version carried the Experience photograph's `lg:right-40` here, and the
           portrait came out 60px left of centre because of it. */}
-      {/* SpecSheetGrid's left-5/right-5 (sm:left-10/right-10) insets must match the
-          title container's below, or the frame drifts from its content. */}
+      {/* SpecSheetGrid's left-10/right-10 (sm:left-20/right-20) insets must match the
+          title container's below, or the frame drifts from its content. Both were
+          moved out from left-5/right-5 (sm:left-10/right-10) together, for a bigger
+          margin — MEASURE_END and the photo strip's own `right-20` below move with
+          it, since all three describe the same gutter. */}
       {opened !== null && COLUMNS[opened] === "About" && (
         <SpecSheetGrid closing={closing} restAt={restAt} />
       )}
 
       <div
         aria-hidden={!settled}
-        className="pointer-events-none absolute left-5 right-5 top-36 sm:left-10 sm:right-10 sm:top-48"
+        className="pointer-events-none absolute left-10 right-10 top-36 sm:left-20 sm:right-20 sm:top-48"
       >
         {/* Each letter owns both its arriving and its leaving, on its own delay —
             forwards from the first on the way in, backwards from the last on the way
@@ -1063,7 +1066,7 @@ export function SpecSheetColumns() {
         {opened !== null && COLUMNS[opened] === "About" && (
           <div className="mt-12 sm:mt-16" style={{ minHeight: BLOCK_H }}>
             {/* A full-bleed rule rather than a border on the wrapper below: the
-                wrapper keeps the title container's left-5/right-10 inset, but the
+                wrapper keeps the title container's left-10/right-20 inset, but the
                 line itself has to reach the page's true edges to match
                 SpecSheetGrid's now edge-to-edge frame. `left: 50%` plus a
                 negative `-50vw` margin is the standard full-bleed break-out — it
@@ -1193,7 +1196,7 @@ export function SpecSheetColumns() {
           and it comes out the same on both sides at every width. */}
       {entries && (
         <div
-          className="pointer-events-none absolute right-10 hidden -translate-y-1/2 sm:block"
+          className="pointer-events-none absolute right-20 hidden -translate-y-1/2 sm:block"
           // Its resting height, and the same figure handed to the CSS: the spacing
           // between two photographs is worked out from it, since a strip that rests
           // off-centre has further to travel to clear the top of the window.

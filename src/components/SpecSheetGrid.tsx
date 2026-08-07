@@ -55,32 +55,34 @@ export function SpecSheetGrid({
       />
 
       {/* Two more verticals, one on each side, sitting exactly where the content's
-          own left/right inset falls — left-5/right-5 (sm:left-10/right-10) is the
-          title container's own inset in SpecSheetColumns.tsx. These mark the margin
-          between the page edge and the content, the way the wireframe's outer
-          margin columns do, distinct from the frame's own edge-to-edge rectangle
-          above and the column dividers between prose/portrait/prose. */}
+          own left/right inset falls — left-10/right-10 (sm:left-20/right-20) is the
+          title container's own inset in SpecSheetColumns.tsx (kept equal to this
+          on purpose: enlarging this margin without moving the content the same
+          amount would run the line straight through the text). These mark the
+          margin between the page edge and the content, the way the wireframe's
+          outer margin columns do, distinct from the frame's own edge-to-edge
+          rectangle above and the column dividers between prose/portrait/prose. */}
       <div
-        className="absolute inset-y-0 left-5 border-l sm:left-10"
+        className="absolute inset-y-0 left-10 border-l sm:left-20"
         style={{ borderColor: "var(--rule)" }}
       />
       <div
-        className="absolute inset-y-0 right-5 border-r sm:right-10"
+        className="absolute inset-y-0 right-10 border-r sm:right-20"
         style={{ borderColor: "var(--rule)" }}
       />
 
-      {/* Same idea, horizontally, and the same top-5/sm:top-10 figure as the
+      {/* Same idea, horizontally, and the same top-10/sm:top-20 figure as the
           verticals above — all four margins read as one uniform frame around
           the page, not a wider gap on one side than another. This sits well
           above the title itself, which keeps its own top-36/sm:top-48 in
           SpecSheetColumns.tsx; the gap between this line and the title is not
           the margin, it is the title row's own height. */}
       <div
-        className="absolute inset-x-0 top-5 border-t sm:top-10"
+        className="absolute inset-x-0 top-10 border-t sm:top-20"
         style={{ borderColor: "var(--rule)" }}
       />
       <div
-        className="absolute inset-x-0 bottom-5 border-t sm:bottom-10"
+        className="absolute inset-x-0 bottom-10 border-t sm:bottom-20"
         style={{ borderColor: "var(--rule)" }}
       />
     </div>
