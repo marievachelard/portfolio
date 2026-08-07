@@ -1062,19 +1062,32 @@ export function SpecSheetColumns() {
             height turns out to be. */}
         {opened !== null && COLUMNS[opened] === "About" && (
           <div className="mt-12 sm:mt-16" style={{ minHeight: BLOCK_H }}>
+            {/* A full-bleed rule rather than a border on the wrapper below: the
+                wrapper keeps the title container's left-5/right-10 inset, but the
+                line itself has to reach the page's true edges to match
+                SpecSheetGrid's now edge-to-edge frame. `left: 50%` plus a
+                negative `-50vw` margin is the standard full-bleed break-out — it
+                only touches the horizontal axis, so the line still lands at
+                exactly this point in the vertical flow. */}
             <div
-              className={`${closing ? "depart" : "arrive"} flex flex-col border-t`}
+              aria-hidden
+              className={`${closing ? "depart" : "arrive"} pointer-events-none relative w-screen border-t`}
+              style={{
+                animationDelay: closing ? "0ms" : `${restAt}ms`,
+                left: "50%",
+                marginLeft: "-50vw",
+                borderColor: "var(--rule)",
+              }}
+            />
+            <div
+              className={`${closing ? "depart" : "arrive"} flex flex-col`}
               style={{
                 animationDelay: closing ? "0ms" : `${restAt}ms`,
                 minHeight: ABOUT_BLOCK_H,
-                borderColor: "var(--rule)",
               }}
             >
               <div className="grid grid-cols-1 gap-10 pt-10 sm:grid-cols-[1fr_1fr] xl:grid-cols-[1fr_1fr_1fr]">
-                <div
-                  className="max-w-[42ch] sm:pr-10"
-                  style={{ borderColor: "var(--rule)" }}
-                >
+                <div className="max-w-[42ch] sm:pr-10">
                   {leading(null)}
                   <p className={`mt-8 sm:mt-10 ${PROSE}`}>{ABOUT_PLACEHOLDER[0]}</p>
                 </div>
@@ -1086,7 +1099,7 @@ export function SpecSheetColumns() {
                     even though the picture behind it is real. */}
                 <div
                   className="relative hidden aspect-square self-start sm:block xl:pr-10"
-                  style={{ borderColor: "var(--rule)", maxHeight: "min(38vh, 28vw)" }}
+                  style={{ maxHeight: "min(38vh, 28vw)" }}
                 >
                   <Image
                     src={portrait}
@@ -1112,10 +1125,14 @@ export function SpecSheetColumns() {
                 </div>
               </div>
 
-              <p
-                className="mt-auto border-t pt-10 text-center"
-                style={{ borderColor: "var(--rule)" }}
-              >
+              {/* Same full-bleed break-out as the rule above the prose columns —
+                  see the comment there. */}
+              <div
+                aria-hidden
+                className="pointer-events-none relative mt-auto w-screen border-t"
+                style={{ left: "50%", marginLeft: "-50vw", borderColor: "var(--rule)" }}
+              />
+              <p className="pt-10 text-center">
                 {mark({
                   href: "https://www.toulouse-tourisme.com/",
                   label: "N 43.60079° / E 1.35044°",

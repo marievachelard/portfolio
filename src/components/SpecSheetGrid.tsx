@@ -20,7 +20,7 @@ export function SpecSheetGrid({
   return (
     <div
       aria-hidden
-      className={`${closing ? "depart" : "arrive"} pointer-events-none absolute left-5 right-5 top-24 bottom-6 sm:left-10 sm:right-10 sm:top-28 sm:bottom-8`}
+      className={`${closing ? "depart" : "arrive"} pointer-events-none absolute inset-0`}
       style={{
         border: "1px solid var(--rule)",
         animationDelay: closing ? "0ms" : `${restAt}ms`,
