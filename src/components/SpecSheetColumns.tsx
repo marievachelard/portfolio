@@ -1092,15 +1092,12 @@ export function SpecSheetColumns() {
                   <p className={`mt-8 sm:mt-10 ${PROSE}`}>{ABOUT_PLACEHOLDER[0]}</p>
                 </div>
 
-                {/* Fills its column instead of sitting in a fixed small
-                    square: this is the wireframe's centre block. The
-                    diagonal hachure is drawn over the portrait rather than
-                    replacing it — it reads as a placeholder-image treatment
-                    even though the picture behind it is real. */}
-                <div
-                  className="relative hidden aspect-square self-start sm:block xl:pr-10"
-                  style={{ maxHeight: "min(38vh, 28vw)" }}
-                >
+                {/* Fills its column instead of sitting in a fixed small square:
+                    this is the wireframe's centre block. No `self-start` and no
+                    fixed aspect ratio — the default grid stretch is what lets it
+                    fill the cell, so its height follows whichever prose column
+                    beside it is tallest rather than a size of its own. */}
+                <div className="relative hidden sm:block xl:pr-10">
                   <Image
                     src={portrait}
                     alt="Portrait de Marie Vachelard, en noir et blanc"
@@ -1108,14 +1105,6 @@ export function SpecSheetColumns() {
                     sizes="33vw"
                     placeholder="blur"
                     className="object-cover"
-                  />
-                  <div
-                    aria-hidden
-                    className="absolute inset-0"
-                    style={{
-                      backgroundImage:
-                        "repeating-linear-gradient(45deg, var(--rule) 0, var(--rule) 1px, transparent 1px, transparent 10px)",
-                    }}
                   />
                 </div>
 
