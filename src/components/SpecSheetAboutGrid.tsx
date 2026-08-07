@@ -104,7 +104,7 @@ export function SpecSheetAboutGrid({
             shown at — prose1 and the portrait share the same b2/b3 and b8/b9 pair in
             the sm and xl templates; prose2 only exists once xl's template supplies
             b14/b15. */}
-        <div style={{ gridColumn: "b2 / b3", gridRow: "r8 / r9", maxWidth: `${values.proseWidth}ch` }}>
+        <div style={{ gridColumn: "b2 / b3", gridRow: "r8 / r9", width: "100%", padding: "0 8px" }}>
           {prose1}
         </div>
         <div
@@ -114,8 +114,8 @@ export function SpecSheetAboutGrid({
           {image}
         </div>
         <div
-          className="ml-auto hidden xl:block"
-          style={{ gridColumn: "b14 / b15", gridRow: "r8 / r9", maxWidth: `${values.proseWidth}ch` }}
+          className="hidden xl:block"
+          style={{ gridColumn: "b14 / b15", gridRow: "r8 / r9", width: "100%", padding: "0 8px" }}
         >
           {prose2}
         </div>

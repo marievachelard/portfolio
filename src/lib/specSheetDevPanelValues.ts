@@ -6,7 +6,6 @@ export type DevPanelValues = {
   titleToRule1: number;
   rule1ToRule2: number;
   imageFlankGap: number;
-  proseWidth: number;
   columnGap: number;
   titleTop: number;
 };
@@ -19,7 +18,6 @@ export const DEFAULT_DEV_PANEL_VALUES: DevPanelValues = {
   titleToRule1: 12,
   rule1ToRule2: 60,
   imageFlankGap: 32,
-  proseWidth: 40,
   columnGap: 40,
   titleTop: 120,
 };

@@ -19,7 +19,6 @@ const FIELDS: {
   { key: "rule1ToRule2", label: "Rule 1 → rule 2", min: 0, max: 150, group: "Title & rules" },
   { key: "imageFlankGap", label: "Image flank gap", min: 0, max: 60, group: "Content" },
   { key: "columnGap", label: "Column gap", min: 0, max: 120, group: "Content" },
-  { key: "proseWidth", label: "Prose width (ch)", min: 20, max: 70, group: "Content" },
 ];
 
 const GROUPS = ["Margins", "Title & rules", "Content"] as const;
