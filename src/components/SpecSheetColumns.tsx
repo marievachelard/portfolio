@@ -1064,7 +1064,7 @@ export function SpecSheetColumns() {
             the same width as the frame around them, whatever the content's
             height turns out to be. */}
         {opened !== null && COLUMNS[opened] === "About" && (
-          <div className="mt-4 sm:mt-6" style={{ minHeight: BLOCK_H }}>
+          <div className="mt-2 sm:mt-3" style={{ minHeight: BLOCK_H }}>
             {/* A full-bleed rule rather than a border on the wrapper below: the
                 wrapper keeps the title container's left-10/right-20 inset, but the
                 line itself has to reach the page's true edges to match
@@ -1084,13 +1084,14 @@ export function SpecSheetColumns() {
             />
             {/* A second rule: the wireframe's title row and content row are not simply
                 back to back — there is a thin row of its own between them, and this
-                is it. Its own position holds steady (mt-10/sm:mt-12, unchanged) while
-                the first rule above moved closer to the title — the gap between the
-                two grew to compensate, which is the point: only the first rule was
-                asked to move. Same full-bleed break-out. */}
+                is it. Its own distance from the title holds steady at 56px/72px
+                (sm) total — the first rule above has moved twice now, each time
+                closer to the title, and each time this rule's own gap grew by
+                the same amount so its position never moved. Same full-bleed
+                break-out. */}
             <div
               aria-hidden
-              className={`${closing ? "depart" : "arrive"} pointer-events-none relative mt-10 w-screen border-t sm:mt-12`}
+              className={`${closing ? "depart" : "arrive"} pointer-events-none relative mt-12 w-screen border-t sm:mt-[60px]`}
               style={{
                 animationDelay: closing ? "0ms" : `${restAt}ms`,
                 left: "50%",
