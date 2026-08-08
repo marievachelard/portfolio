@@ -476,7 +476,6 @@ export function LiquidColumns() {
   // are still out at this point — they only come back once it has landed.
   const [closing, setClosing] = useState(false);
   const stageTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [cubeHovered, setCubeHovered] = useState(false);
   // Where the cube parks, read from the renderer's own reckoning so the label beside
   // it cannot drift off it on a short window.
   const [dock, setDock] = useState(() => dockGeometry(1440, 900));
@@ -665,7 +664,6 @@ export function LiquidColumns() {
   }, []);
 
   const hoverCube = (on: boolean) => {
-    setCubeHovered(on);
     const r = renderer.current;
     if (!r) return;
     r.target.cubeHover = on;
@@ -1261,38 +1259,10 @@ export function LiquidColumns() {
         aria-label="Close"
         // No cursor-pointer: a hand here would swap the dot out for an arrow and read
         // as the custom cursor breaking. What this area is is announced by the cube
-        // turning and by [ CLOSE ] appearing, which say more than a hand would.
+        // turning, which says more than a hand would.
         className="absolute left-0 top-0 h-40 w-40"
         style={{ pointerEvents: settled ? "auto" : "none" }}
       />
-
-      {/* Named only while the pointer is on it. Placed off the cube's own parked
-          geometry — centred on its middle, its baseline clearing how far the tilted
-          corners actually reach — so it sits over the cube and not over the hit area,
-          which is a square much larger than the cube itself.
-
-          The floor on `top` is for very short or narrow windows, where the cube parks
-          closer to the corner and there is barely room above it: without it the label
-          would ride off the top of the page. It can end up grazing the cube there,
-          which is the lesser problem.
-
-          Marked aria-hidden: the button already carries the accessible name, and
-          this would only say it twice. */}
-      <span
-        aria-hidden
-        className="pointer-events-none absolute font-mono text-[10px] tracking-[0.2em] text-neutral-400 sm:text-xs"
-        style={{
-          left: dock.x,
-          top: Math.max(20, dock.y - dock.reach - 12),
-          transform: "translate(-50%, -100%)",
-          opacity: cubeHovered ? 1 : 0,
-          // Slower in than out on purpose: leaving, it has to be gone before the block
-          // below has moved far, or it reads as lingering rather than as first out.
-          transition: `opacity ${cubeHovered ? 260 : 160}ms linear`,
-        }}
-      >
-        [ CLOSE ]
-      </span>
     </main>
   );
 }
