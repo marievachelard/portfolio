@@ -202,6 +202,103 @@ a {
   animation: depart 480ms cubic-bezier(0.64, 0, 0.78, 0) both;
 }
 
+/* The About grid's own lines, pulled into place by the cube setting off for its
+   dock rather than risen with the content the way the whole sheet used to arrive
+   as one block. Horizontal, not vertical — the same axis the home page's shutters
+   exit on, but reversed: those read as the cube pushing the columns out, this reads
+   as the cube pulling the grid in behind it.
+
+   The shutters' own two curves, split the same way: a cut for the movement (slow,
+   then a hard snap) and a flat linear crossfade for the opacity. And, like the
+   shutters, the same pair of curves both ways, on their own explicit keyframes
+   rather than one set played in `reverse` for the close — reverse turned out not
+   to honour `animation-delay` the way `both` promises to (it held the *end* state
+   for the whole delay instead of the start one, so the close read as instant).
+   Four keyframes rather than two: a single `animation` can only carry one timing
+   function for everything it touches, and each direction needs its own pair.
+
+   650ms, not the shutters' 800: this has to land the instant the cube itself
+   does (ARRIVE_MS in SpecSheetColumns.tsx), not on the shutters' own clock. */
+@keyframes grid-lines-slide-in {
+  from {
+    transform: translateX(-64px);
+  }
+  to {
+    transform: none;
+  }
+}
+
+@keyframes grid-lines-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes grid-lines-slide-out {
+  from {
+    transform: none;
+  }
+  to {
+    transform: translateX(-64px);
+  }
+}
+
+@keyframes grid-lines-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.grid-lines-in {
+  animation:
+    grid-lines-slide-in 650ms cubic-bezier(0.72, 0, 0.18, 1) both,
+    grid-lines-fade-in 650ms linear both;
+}
+
+.grid-lines-out {
+  animation:
+    grid-lines-slide-out 650ms cubic-bezier(0.72, 0, 0.18, 1) both,
+    grid-lines-fade-out 650ms linear both;
+}
+
+/* The About grid's content — portrait, prose, legend — fades into the lines the
+   cube already drew, rather than rising into them the way arrive/depart's
+   translateY still does for every other block on the page (the entries under
+   Experience, Projects and Contact). Pure opacity: this content has no direction
+   of travel to answer to the way the grid lines or the shutters do. Same curves
+   and durations as arrive/depart, minus the transform. */
+@keyframes content-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.content-fade-in {
+  animation: content-fade-in 700ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes content-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.content-fade-out {
+  animation: content-fade-out 480ms cubic-bezier(0.64, 0, 0.78, 0) both;
+}
+
 /* ------------------------------ the marks that link ------------------------------
    A link on this page is a mark in mono with brackets around it, the same as [ CLOSE ]
    and the counter. It rests with its letters spread apart, and the cursor closes them
@@ -297,7 +394,11 @@ a {
   .type-in,
   .type-out,
   .arrive,
-  .depart {
+  .depart,
+  .grid-lines-in,
+  .grid-lines-out,
+  .content-fade-in,
+  .content-fade-out {
     animation-duration: 1ms;
   }
 

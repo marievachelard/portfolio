@@ -48,6 +48,18 @@ const SHRINK_MS = 450;
     other appears. */
 const CROSS_FADE_MS = 320;
 
+/** When the About grid's own lines start sliding into place — the moment the
+    cube sets off for its dock, not the title's schedule the grid's content
+    still runs on. Named for readability at the call site; the value really is
+    just SHUTTER_MS. */
+const GRID_LINES_AT = SHUTTER_MS;
+
+/** Must match .type-in/.type-out's own animation-duration in globals.css — how
+    long one letter takes to fade in or out. Needed here too: the About grid's
+    content now has to start and finish on exactly the title+aside's own clock,
+    which means knowing how long that last letter takes to finish appearing. */
+const TYPE_LETTER_MS = 80;
+
 /**
  * One item of a list a section can be scrolled through. Two sections have such a list —
  * Experience and Projects — and they are the same thing to everything below: the same
@@ -289,6 +301,10 @@ const HANDOVER = 0.1;
  * time from TYPE_START, and everything that belongs under it waits for the last
  * letter plus a beat before rising into place. So the length of the sequence follows
  * the length of the word — see `typedAt` below.
+ *
+ * About overrides this with its own start (see `titleStartAt`): its title has the
+ * grid's lines to wait for, which the other sections have nothing equivalent to,
+ * so this stays their own fixed beat after the shutters clear.
  */
 const TYPE_START = SHUTTER_MS + 380;
 const TYPE_STEP = 45;
@@ -760,6 +776,12 @@ export function SpecSheetColumns() {
 
     const letters = COLUMNS[opened].length;
     const wordsGone = UNTYPE_START + (letters - 1) * UNTYPE_STEP + CUBE_GAP;
+    // About's cube waits for the grid's lines too, not just the words — they are
+    // the last thing standing once the title and content have gone, so the trip
+    // home is on hold until they have finished sliding back out (ARRIVE_MS, the
+    // same span they took coming in).
+    const flightDelay =
+      COLUMNS[opened] === "About" ? aboutLinesOutAt + ARRIVE_MS : wordsGone;
 
     stageTimer.current = setTimeout(() => {
       const rr0 = renderer.current;
@@ -783,7 +805,7 @@ export function SpecSheetColumns() {
         // A click without an intervening move must not reopen the column it just left.
         hovered.current = -1;
       }, SHUTTER_MS);
-    }, wordsGone);
+    }, flightDelay);
   };
 
   // What the [ X ] and Escape actually call. The reverse of arriving, beat for
@@ -911,9 +933,36 @@ export function SpecSheetColumns() {
   // title and the way back out belong on screen. False the instant it sets off home.
   const settled = opened !== null && !closing;
   const label = opened === null ? "" : COLUMNS[opened];
+  /** When the title's first letter starts typing. About waits for its grid's lines
+      to finish sliding into place (GRID_LINES_AT + ARRIVE_MS — the same instant
+      the cube itself lands, since the lines were timed to land with it); every
+      other section has no grid to wait on, so it keeps the fixed TYPE_START beat. */
+  const titleStartAt =
+    label === "About" ? GRID_LINES_AT + ARRIVE_MS : TYPE_START;
   /** When the last letter of the title has landed, and when the rest follows it. */
-  const typedAt = TYPE_START + Math.max(0, label.length - 1) * TYPE_STEP;
+  const typedAt = titleStartAt + Math.max(0, label.length - 1) * TYPE_STEP;
   const restAt = typedAt + REST_GAP;
+  /** How long the About grid's content fade has to run so that it starts the
+      instant the title's first letter does (titleStartAt) and finishes the instant
+      the title's last letter — and its aside, which lands on the same beat — are
+      fully in. Depends on the label's own length, same as typedAt does. */
+  const aboutContentInDuration = typedAt + TYPE_LETTER_MS - titleStartAt;
+  /**
+   * Closing reverses the arrival order, not just the letters: the grid's lines
+   * were first to arrive, so they are last to leave, waiting for the title and
+   * the content to finish departing first — which the two of them do together,
+   * the same way they arrived together.
+   *
+   * The title's own per-letter unwind already runs on UNTYPE_START/UNTYPE_STEP
+   * (unchanged, shared with every other section); this just points the content
+   * fade at the same clock instead of TYPE_START/TYPE_STEP's, so the two leave
+   * as one movement here too. `aboutLinesOutAt` is then the instant both are
+   * fully gone — the earliest the lines themselves are allowed to start.
+   */
+  const aboutContentOutAt = UNTYPE_START;
+  const aboutContentOutDuration =
+    Math.max(0, label.length - 1) * UNTYPE_STEP + TYPE_LETTER_MS;
+  const aboutLinesOutAt = aboutContentOutAt + aboutContentOutDuration;
   // The same figure SpecSheetAboutGrid computes for its own "titleSpace" track — the
   // reserved row between the margin line and the first rule under the title. Centring
   // the title in exactly this height, rather than pinning it to a top offset, is what
@@ -1079,7 +1128,12 @@ export function SpecSheetColumns() {
       {opened !== null && COLUMNS[opened] === "About" && (
         <SpecSheetAboutGrid
           closing={closing}
-          restAt={restAt}
+          linesInAt={GRID_LINES_AT}
+          linesOutAt={aboutLinesOutAt}
+          contentInAt={titleStartAt}
+          contentInDuration={aboutContentInDuration}
+          contentOutAt={aboutContentOutAt}
+          contentOutDuration={aboutContentOutDuration}
           values={devPanelValues}
           prose1={
             <>
@@ -1156,7 +1210,7 @@ export function SpecSheetColumns() {
                   style={{
                     animationDelay: closing
                       ? `${UNTYPE_START + (label.length - 1 - i) * UNTYPE_STEP}ms`
-                      : `${TYPE_START + i * TYPE_STEP}ms`,
+                      : `${titleStartAt + i * TYPE_STEP}ms`,
                   }}
                 >
                   {letter}
