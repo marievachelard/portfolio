@@ -18,13 +18,7 @@ import stage from "@/images/experience/open-air-stage.jpg";
 import dome from "@/images/experience/toulouse-garonne-dome.jpg";
 import portrait from "@/images/about/marie-vachelard.jpg";
 import { SpecSheetAboutGrid } from "@/components/SpecSheetAboutGrid";
-import { SpecSheetDevPanel } from "@/components/SpecSheetDevPanel";
-import {
-  DEFAULT_DEV_PANEL_VALUES,
-  loadDevPanelValues,
-  saveDevPanelValues,
-  type DevPanelValues,
-} from "@/lib/specSheetDevPanelValues";
+import { DEFAULT_DEV_PANEL_VALUES } from "@/lib/specSheetDevPanelValues";
 import shopfront from "@/images/projects/shop-window-paintings.jpg";
 import ridge from "@/images/projects/mountain-ridge-hiker.jpg";
 
@@ -521,30 +515,10 @@ export function SpecSheetColumns() {
   // `paint` below for why that is the one place it can.
   const [textIndex, setTextIndex] = useState(0);
   const mainRef = useRef<HTMLElement>(null);
-  // The dev panel's own tunable values, driving the About spec-sheet grid. Seeded from
-  // localStorage lazily (window isn't available during SSR), and re-saved on every
-  // change so a reload keeps whatever the sliders were last set to.
-  const [devPanelValues, setDevPanelValues] = useState<DevPanelValues>(
-    DEFAULT_DEV_PANEL_VALUES,
-  );
-  // The measure() effect below only runs once (on mount) — its closure would
-  // otherwise see whichever devPanelValues existed at that first render, not later
-  // ones from the dev panel. Synced in its own effect (never write a ref directly
-  // during render) so measure() can read the latest value regardless of when it's
-  // called.
-  const devPanelValuesRef = useRef(devPanelValues);
-  useEffect(() => {
-    devPanelValuesRef.current = devPanelValues;
-  }, [devPanelValues]);
-  useEffect(() => {
-    // Deliberate: reading localStorage during the lazy useState initializer would run
-    // on both the server (SSR) and the client's first render, and disagree — the
-    // effect's whole job is to synchronize this component's state with that external
-    // store strictly after mount, which is exactly what the lint rule is warning
-    // about missing in cases that don't actually need it. This one does.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setDevPanelValues(loadDevPanelValues());
-  }, []);
+  // Was the dev panel's own tunable state (localStorage-backed sliders) while the
+  // panel existed; now just the values it settled on, driving the About spec-sheet
+  // grid as fixed constants.
+  const layoutValues = DEFAULT_DEV_PANEL_VALUES;
 
   /**
    * The open section's entries, or null if it has none. Everything that used to name
@@ -701,10 +675,10 @@ export function SpecSheetColumns() {
       // is now centred in — see the titleSpace comment above), and its right edge
       // is floored to the outer margin line rather than a fixed corner inset, so it
       // never overhangs past it however wide that margin is set.
-      const dv = devPanelValuesRef.current;
-      const dvTitleSpace = dv.titleTop + TITLE_LINE - dv.marginTop - 1;
-      const dockY = dv.marginTop + 1 + dvTitleSpace / 2;
-      const dockX = window.innerWidth - dv.marginRight - base.reach;
+      const dvTitleSpace =
+        layoutValues.titleTop + TITLE_LINE - layoutValues.marginTop - 1;
+      const dockY = layoutValues.marginTop + 1 + dvTitleSpace / 2;
+      const dockX = window.innerWidth - layoutValues.marginRight - base.reach;
       const next = { ...base, x: dockX, y: dockY };
       setDock((was) =>
         was.x === next.x && was.y === next.y && was.reach === next.reach
@@ -737,20 +711,6 @@ export function SpecSheetColumns() {
       renderer.current = null;
     };
   }, []);
-
-  // Re-run the cube's dock geometry whenever a slider changes — measure() reads
-  // devPanelValuesRef itself, but nothing else prompts it to run again between
-  // resizes, and a margin/title slider is exactly the kind of change that has to
-  // move the cube immediately, not on the next resize.
-  useEffect(() => {
-    remeasure.current?.();
-    renderer.current?.wake();
-  }, [devPanelValues]);
-
-  const handleDevPanelChange = (next: DevPanelValues) => {
-    setDevPanelValues(next);
-    saveDevPanelValues(next);
-  };
 
   // open() run backwards, beat for beat. Flipping `closing` starts the words leaving —
   // the block drops, then the title unwinds from its last letter, both on delays in
@@ -985,10 +945,10 @@ export function SpecSheetColumns() {
   // The same figure SpecSheetAboutGrid computes for its own "titleSpace" track — the
   // reserved row between the margin line and the first rule under the title. Centring
   // the title in exactly this height, rather than pinning it to a top offset, is what
-  // "Title top" now actually moves: not the title's own position, but how much of this
+  // `titleTop` actually moves: not the title's own position, but how much of this
   // row is above it versus below.
   const titleSpace =
-    devPanelValues.titleTop + TITLE_LINE - devPanelValues.marginTop - 1;
+    layoutValues.titleTop + TITLE_LINE - layoutValues.marginTop - 1;
 
   /** The aside on the title's own baseline. A list says which entry of how many; About
       introduces the person whose page this is, and Contact invites the reason for being
@@ -1153,7 +1113,7 @@ export function SpecSheetColumns() {
           contentInDuration={aboutContentInDuration}
           contentOutAt={aboutContentOutAt}
           contentOutDuration={aboutContentOutDuration}
-          values={devPanelValues}
+          values={layoutValues}
           prose1={
             <>
               {leading(null)}
@@ -1185,21 +1145,20 @@ export function SpecSheetColumns() {
         />
       )}
 
-      {/* The title container's left/right now come from the dev panel's values
-          (marginLeft/marginRight) rather than static classes, applied at every width
-          for now — see SpecSheetDevPanel. Its own top is pinned right after the top
-          margin line (marginTop + 1) rather than at titleTop directly — the title row
-          just inside it (below) is what titleTop now positions, by centring within
-          titleSpace. MEASURE_END and the photo strip's own `right-20` below are not
-          wired to these values; they drift out of sync if the panel's margins change,
-          same as the dev-panel spec already calls out as a known, accepted gap. */}
+      {/* The title container's left/right come from the layout values
+          (marginLeft/marginRight) rather than static classes, applied at every width.
+          Its own top is pinned right after the top margin line (marginTop + 1) rather
+          than at titleTop directly — the title row just inside it (below) is what
+          titleTop positions, by centring within titleSpace. MEASURE_END and the photo
+          strip's own `right-20` below are not wired to these values — a known, accepted
+          gap rather than an oversight. */}
       <div
         aria-hidden={!settled}
         className="pointer-events-none absolute"
         style={{
-          left: devPanelValues.marginLeft,
-          right: devPanelValues.marginRight,
-          top: devPanelValues.marginTop + 1,
+          left: layoutValues.marginLeft,
+          right: layoutValues.marginRight,
+          top: layoutValues.marginTop + 1,
         }}
       >
         {/* Width 100%, an 8px inline padding, and vertical centring in titleSpace —
@@ -1436,8 +1395,6 @@ export function SpecSheetColumns() {
         </span>
         <span className="mark-label">[ X ]</span>
       </button>
-
-      <SpecSheetDevPanel values={devPanelValues} onChange={handleDevPanelChange} />
     </main>
   );
 }

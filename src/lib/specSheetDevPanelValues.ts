@@ -10,6 +10,8 @@ export type DevPanelValues = {
   titleTop: number;
 };
 
+// The dev panel these were once tuned through is gone; this is just the values
+// it settled on, kept as the fixed layout the About spec sheet renders with.
 export const DEFAULT_DEV_PANEL_VALUES: DevPanelValues = {
   marginTop: 80,
   marginBottom: 80,
@@ -21,22 +23,3 @@ export const DEFAULT_DEV_PANEL_VALUES: DevPanelValues = {
   columnGap: 40,
   titleTop: 120,
 };
-
-const STORAGE_KEY = "about-lab-dev-panel";
-
-export function loadDevPanelValues(): DevPanelValues {
-  if (typeof window === "undefined") return DEFAULT_DEV_PANEL_VALUES;
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return DEFAULT_DEV_PANEL_VALUES;
-    const parsed = JSON.parse(raw);
-    return { ...DEFAULT_DEV_PANEL_VALUES, ...parsed };
-  } catch {
-    return DEFAULT_DEV_PANEL_VALUES;
-  }
-}
-
-export function saveDevPanelValues(values: DevPanelValues) {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(values));
-}
