@@ -768,20 +768,22 @@ export function SpecSheetColumns() {
     if (crossTimer.current) clearTimeout(crossTimer.current);
     // The cube has to be the thing flying home, not the [ X ] — so if it had
     // already parked and shrunk away, this puts it back at full size before the
-    // flight starts. requestClose is what actually waits for the grow to finish
-    // before calling this; called directly, the two now just run at once.
+    // flight starts. For About, requestClose calls this at the same moment it
+    // sets the cube growing, so this is what actually starts it; for every
+    // other section requestClose already waited for the grow to finish, so
+    // this is a no-op repeat of what it just did.
     setParked(false);
     setCrossVisible(false);
     setClosing(true);
 
     const letters = COLUMNS[opened].length;
+    const isAbout = COLUMNS[opened] === "About";
     const wordsGone = UNTYPE_START + (letters - 1) * UNTYPE_STEP + CUBE_GAP;
-    // About's cube waits for the grid's lines too, not just the words — they are
-    // the last thing standing once the title and content have gone, so the trip
-    // home is on hold until they have finished sliding back out (ARRIVE_MS, the
-    // same span they took coming in).
-    const flightDelay =
-      COLUMNS[opened] === "About" ? aboutLinesOutAt + ARRIVE_MS : wordsGone;
+    // About's trip home waits on two things growing at once from this same
+    // instant: the cube itself (SHRINK_MS to grow back) and, once it's done,
+    // the grid's lines sliding back out (ARRIVE_MS, the same span they took
+    // coming in) — they were first to arrive, so they're last to leave.
+    const flightDelay = isAbout ? SHRINK_MS + ARRIVE_MS : wordsGone;
 
     stageTimer.current = setTimeout(() => {
       const rr0 = renderer.current;
@@ -810,8 +812,16 @@ export function SpecSheetColumns() {
 
   // What the [ X ] and Escape actually call. The reverse of arriving, beat for
   // beat: the [ X ] fades out first, then the cube grows back from the dock point
-  // it shrank into, and only once it is back at full size does close() set it
-  // flying — otherwise it would take off still tiny.
+  // it shrank into.
+  //
+  // About calls close() the instant the cube sets off growing, not once it is
+  // back at full size — mirroring how the title, aside and content all started
+  // arriving at the exact moment the cube started shrinking, not once it had
+  // finished. The cube simply takes longer (SHRINK_MS) than they do, so it is
+  // the last of the four to actually finish, same as on the way in. Every other
+  // section has no such thing to mirror, so it keeps waiting for the grow to
+  // finish first — the cube there really is the only thing on screen.
+  //
   // Caught before the cube has even parked (mid-flight in, or mid-shrink before
   // the [ X ] itself has shown), there is nothing on screen to wait out, so this
   // skips straight to whichever step still applies.
@@ -826,11 +836,16 @@ export function SpecSheetColumns() {
       return;
     }
 
+    const isAbout = COLUMNS[opened] === "About";
     const wasShown = crossVisible;
     setCrossVisible(false);
     stageTimer.current = setTimeout(() => {
       setParked(false);
-      stageTimer.current = setTimeout(close, SHRINK_MS);
+      if (isAbout) {
+        close();
+      } else {
+        stageTimer.current = setTimeout(close, SHRINK_MS);
+      }
     }, wasShown ? CROSS_FADE_MS : 0);
   };
 
@@ -947,22 +962,26 @@ export function SpecSheetColumns() {
       the title's last letter — and its aside, which lands on the same beat — are
       fully in. Depends on the label's own length, same as typedAt does. */
   const aboutContentInDuration = typedAt + TYPE_LETTER_MS - titleStartAt;
+  /** When the title starts unwinding on close. About starts the instant `close`
+      is called — which requestClose now times to the cube setting off growing,
+      not to it finishing — the same way the title started typing the instant
+      the cube set off shrinking, not once it had finished. Every other section
+      keeps the fixed UNTYPE_START beat, since requestClose still waits for
+      their grow to finish first. */
+  const titleUnwindStartAt = label === "About" ? 0 : UNTYPE_START;
   /**
-   * Closing reverses the arrival order, not just the letters: the grid's lines
-   * were first to arrive, so they are last to leave, waiting for the title and
-   * the content to finish departing first — which the two of them do together,
-   * the same way they arrived together.
-   *
-   * The title's own per-letter unwind already runs on UNTYPE_START/UNTYPE_STEP
-   * (unchanged, shared with every other section); this just points the content
-   * fade at the same clock instead of TYPE_START/TYPE_STEP's, so the two leave
-   * as one movement here too. `aboutLinesOutAt` is then the instant both are
-   * fully gone — the earliest the lines themselves are allowed to start.
+   * The content fade points at the same clock the title's own per-letter unwind
+   * does (titleUnwindStartAt/UNTYPE_STEP instead of TYPE_START/TYPE_STEP's), so
+   * the two leave as one movement here too — the same way they arrived together.
    */
-  const aboutContentOutAt = UNTYPE_START;
+  const aboutContentOutAt = titleUnwindStartAt;
   const aboutContentOutDuration =
     Math.max(0, label.length - 1) * UNTYPE_STEP + TYPE_LETTER_MS;
-  const aboutLinesOutAt = aboutContentOutAt + aboutContentOutDuration;
+  /** The grid's lines wait for the cube, not the content — they answer to it in
+      both directions. It takes SHRINK_MS to grow back from the instant `close`
+      is called, same as the lines took ARRIVE_MS to land from the instant it
+      set off shrinking on the way in. */
+  const aboutLinesOutAt = SHRINK_MS;
   // The same figure SpecSheetAboutGrid computes for its own "titleSpace" track — the
   // reserved row between the margin line and the first rule under the title. Centring
   // the title in exactly this height, rather than pinning it to a top offset, is what
@@ -1209,7 +1228,7 @@ export function SpecSheetColumns() {
                   className={closing ? "type-out" : "type-in"}
                   style={{
                     animationDelay: closing
-                      ? `${UNTYPE_START + (label.length - 1 - i) * UNTYPE_STEP}ms`
+                      ? `${titleUnwindStartAt + (label.length - 1 - i) * UNTYPE_STEP}ms`
                       : `${titleStartAt + i * TYPE_STEP}ms`,
                   }}
                 >
