@@ -26,6 +26,10 @@ export function SpecSheetAboutGrid({
   contentInDuration,
   contentOutAt,
   contentOutDuration,
+  imageVisible,
+  imageFadeMs,
+  imageCellRefSm,
+  imageCellRefXl,
   values,
   prose1,
   image,
@@ -53,6 +57,23 @@ export function SpecSheetAboutGrid({
   /** How long that fade takes — sized so it finishes exactly when the title (and
       its aside) finish unwinding. */
   contentOutDuration: number;
+  /**
+   * The portrait's own opacity, independent of the content fade above. On the
+   * way in it stays true the whole time — the content fade already handles it,
+   * arriving with prose/legend. On the way out, SpecSheetColumns flips it false
+   * the instant the [ X ] is clicked, well before `closing` (and the content
+   * fade-out it drives) even starts: the image has to be gone, revealing the
+   * liquid the cube is about to re-crystallise from, before the rest of the
+   * close sequence begins.
+   */
+  imageVisible: boolean;
+  /** How long that fade-out takes. */
+  imageFadeMs: number;
+  /** Attached to the portrait's own cell (one per breakpoint variant, only one
+      ever laid out at a time) so SpecSheetColumns can measure it — that cell's
+      centre and size are the cube's dock and fill target. */
+  imageCellRefSm: (el: HTMLDivElement | null) => void;
+  imageCellRefXl: (el: HTMLDivElement | null) => void;
   values: DevPanelValues;
   prose1: ReactNode;
   image: ReactNode;
@@ -172,16 +193,34 @@ export function SpecSheetAboutGrid({
               1fr track inside it. Two variants: two-column mode's image already touches
               the outer right margin line directly (no padding track past it, by design
               — see the doubled-pair comment above), so only its left side gains the
-              extra span; three-column mode gains it on both sides. */}
+              extra span; three-column mode gains it on both sides.
+
+              Its own opacity/transition (imageVisible/imageFadeMs), separate from the
+              content-fade-in/out this cell's siblings run on — see imageVisible's own
+              comment above for why the two have to be decoupled. The ref is this same
+              cell rather than the image itself: SpecSheetColumns reads its box for both
+              the cube's dock point and the size it grows to fill. */}
           <div
+            ref={imageCellRefSm}
             className="relative hidden sm:block xl:hidden"
-            style={{ gridColumn: "b7 / b9", gridRow: "r7 / r10" }}
+            style={{
+              gridColumn: "b7 / b9",
+              gridRow: "r7 / r10",
+              opacity: imageVisible ? 1 : 0,
+              transition: `opacity ${imageFadeMs}ms linear`,
+            }}
           >
             {image}
           </div>
           <div
+            ref={imageCellRefXl}
             className="relative hidden xl:block"
-            style={{ gridColumn: "b7 / b10", gridRow: "r7 / r10" }}
+            style={{
+              gridColumn: "b7 / b10",
+              gridRow: "r7 / r10",
+              opacity: imageVisible ? 1 : 0,
+              transition: `opacity ${imageFadeMs}ms linear`,
+            }}
           >
             {image}
           </div>

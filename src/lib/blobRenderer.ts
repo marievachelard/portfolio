@@ -154,6 +154,7 @@ export function createBlobRenderer(canvas: HTMLCanvasElement): BlobRenderer | nu
     center: gl.getUniformLocation(program, "uCenter"),
     unit: gl.getUniformLocation(program, "uUnit"),
     clip: gl.getUniformLocation(program, "uClip"),
+    clipY: gl.getUniformLocation(program, "uClipY"),
     half: gl.getUniformLocation(program, "uHalf"),
     cubeHalf: gl.getUniformLocation(program, "uCubeHalf"),
     fade: gl.getUniformLocation(program, "uFade"),
@@ -472,6 +473,8 @@ export function createBlobRenderer(canvas: HTMLCanvasElement): BlobRenderer | nu
     gl.uniform2f(u.center, body.x * dpr, (cssH - body.y) * dpr);
     gl.uniform1f(u.unit, unit * dpr);
     gl.uniform2f(u.clip, clipL * dpr, clipR * dpr);
+    // Every column here runs the full canvas height — wide open, always.
+    gl.uniform2f(u.clipY, 0, canvas.height);
     gl.uniform3f(u.half, HALF_X, halfY, HALF_Z);
     gl.uniform1f(u.fade, fade);
     gl.uniform1f(u.cube, body.cube);

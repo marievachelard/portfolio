@@ -29,6 +29,8 @@ uniform vec2  uRes;      // canvas size, device px
 uniform vec2  uCenter;   // column centre, device px (gl origin: bottom-left)
 uniform float uUnit;     // device px per world unit (half a column = 1.0)
 uniform vec2  uClip;     // left / right clip edges, device px — always on a column boundary
+uniform vec2  uClipY;    // top / bottom clip edges, device px — set wide open (0/uRes.y)
+                         // unless a body is confined to less than the full column height
 uniform vec3  uHalf;     // half extents of the liquid pillar, world units
 uniform float uCubeHalf; // half edge of the crystallised cube, world units
 uniform float uFade;     // 0..1 opacity only — softens the cut between columns without resizing
@@ -251,8 +253,15 @@ void main(){
   // silhouette gets sliced off, leaving dead-straight edges against the grey
   // rules while the liquid goes on deforming behind them. Both edges always sit
   // on a column boundary, so a body in transit is cut by the grid itself.
+  //
+  // uClipY is the same idea on the other axis — every column runs the full
+  // canvas height, where OVERFLOW_Y's spill off the top/bottom is invisible
+  // against the edge of the screen, so this has always been wide open there.
+  // A body confined to less than that (a cell, not a column) sets it for real.
   float gate = smoothstep(uClip.x, uClip.x + 1.0, gl_FragCoord.x)
-             * (1.0 - smoothstep(uClip.y - 1.0, uClip.y, gl_FragCoord.x));
+             * (1.0 - smoothstep(uClip.y - 1.0, uClip.y, gl_FragCoord.x))
+             * smoothstep(uClipY.x, uClipY.x + 1.0, gl_FragCoord.y)
+             * (1.0 - smoothstep(uClipY.y - 1.0, uClipY.y, gl_FragCoord.y));
 
   if (uFade < 0.004 || gate < 0.002) discard;
 
