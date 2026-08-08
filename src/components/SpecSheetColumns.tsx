@@ -33,6 +33,21 @@ const COLUMNS = ["About", "Experience", "Projects", "Contact"];
 /** How long the shutters take to clear the frame before the cube is released. */
 const SHUTTER_MS = 650;
 
+/** How long after the cube is set flying to its dock it takes to actually arrive
+    there — the ease it flies on covers most of the distance in about this long. */
+const ARRIVE_MS = 650;
+
+/** How long the cube takes to shrink into its dock point once parked, and to
+    grow back out of it when the [ X ] hands back to it. A scale, not a fade —
+    the cube visibly collapses to the point the [ X ] then occupies. */
+const SHRINK_MS = 450;
+
+/** The [ X ]'s own fade, run only once the cube has finished shrinking away —
+    and, on the way back, only before the cube starts growing again. The two
+    are sequential, not a crossfade, so one is always fully gone before the
+    other appears. */
+const CROSS_FADE_MS = 320;
+
 /**
  * One item of a list a section can be scrolled through. Two sections have such a list —
  * Experience and Projects — and they are the same thing to everything below: the same
@@ -467,6 +482,17 @@ export function SpecSheetColumns() {
   // are still out at this point — they only come back once it has landed.
   const [closing, setClosing] = useState(false);
   const stageTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // The cube has actually landed at its dock — as opposed to `docked`, which flips
+  // the moment it sets off flying there. Once true, the cube shrinks into the dock
+  // point; closing runs this back to false first so the cube grows back before it
+  // sets off home.
+  const [parked, setParked] = useState(false);
+  // The [ X ] itself, shown only once the cube has finished shrinking away — see
+  // SHRINK_MS/CROSS_FADE_MS above for why this trails `parked` rather than mirroring
+  // it.
+  const [crossVisible, setCrossVisible] = useState(false);
+  const arriveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const crossTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Where the cube parks, read from the renderer's own reckoning so the label beside
   // it cannot drift off it on a short window.
   const [dock, setDock] = useState(() => dockGeometry(1440, 900));
@@ -710,13 +736,6 @@ export function SpecSheetColumns() {
     saveDevPanelValues(next);
   };
 
-  const hoverCube = (on: boolean) => {
-    const r = renderer.current;
-    if (!r) return;
-    r.target.cubeHover = on;
-    r.wake();
-  };
-
   // open() run backwards, beat for beat. Flipping `closing` starts the words leaving —
   // the block drops, then the title unwinds from its last letter, both on delays in
   // CSS. The cube waits for that to finish before it sets off home, and only once it
@@ -729,12 +748,14 @@ export function SpecSheetColumns() {
     const r = renderer.current;
     if (!r || opened === null || closing) return;
     if (stageTimer.current) clearTimeout(stageTimer.current);
-    // First off the stage, before the block even starts to drop. It has to be done
-    // here: the hit area goes inert on the same frame, and pointerleave is not
-    // reliably fired for a pointer left sitting on something that stopped listening —
-    // so nothing else would ever clear it. It also unwinds the cube's tumble, which
-    // has no business being held while the cube flies home.
-    hoverCube(false);
+    if (arriveTimer.current) clearTimeout(arriveTimer.current);
+    if (crossTimer.current) clearTimeout(crossTimer.current);
+    // The cube has to be the thing flying home, not the [ X ] — so if it had
+    // already parked and shrunk away, this puts it back at full size before the
+    // flight starts. requestClose is what actually waits for the grow to finish
+    // before calling this; called directly, the two now just run at once.
+    setParked(false);
+    setCrossVisible(false);
     setClosing(true);
 
     const letters = COLUMNS[opened].length;
@@ -765,21 +786,49 @@ export function SpecSheetColumns() {
     }, wordsGone);
   };
 
+  // What the [ X ] and Escape actually call. The reverse of arriving, beat for
+  // beat: the [ X ] fades out first, then the cube grows back from the dock point
+  // it shrank into, and only once it is back at full size does close() set it
+  // flying — otherwise it would take off still tiny.
+  // Caught before the cube has even parked (mid-flight in, or mid-shrink before
+  // the [ X ] itself has shown), there is nothing on screen to wait out, so this
+  // skips straight to whichever step still applies.
+  const requestClose = () => {
+    if (opened === null || closing) return;
+    if (arriveTimer.current) clearTimeout(arriveTimer.current);
+    if (crossTimer.current) clearTimeout(crossTimer.current);
+    if (stageTimer.current) clearTimeout(stageTimer.current);
+
+    if (!parked) {
+      close();
+      return;
+    }
+
+    const wasShown = crossVisible;
+    setCrossVisible(false);
+    stageTimer.current = setTimeout(() => {
+      setParked(false);
+      stageTimer.current = setTimeout(close, SHRINK_MS);
+    }, wasShown ? CROSS_FADE_MS : 0);
+  };
+
   useEffect(() => {
     if (opened === null) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        close();
+        requestClose();
         return;
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [opened, closing]);
+  }, [opened, closing, parked, crossVisible]);
 
   useEffect(() => {
     return () => {
       if (stageTimer.current) clearTimeout(stageTimer.current);
+      if (arriveTimer.current) clearTimeout(arriveTimer.current);
+      if (crossTimer.current) clearTimeout(crossTimer.current);
     };
   }, []);
 
@@ -849,6 +898,12 @@ export function SpecSheetColumns() {
     if (stageTimer.current) clearTimeout(stageTimer.current);
     stageTimer.current = setTimeout(() => {
       if (renderer.current) renderer.current.target.docked = true;
+      if (arriveTimer.current) clearTimeout(arriveTimer.current);
+      arriveTimer.current = setTimeout(() => {
+        setParked(true);
+        if (crossTimer.current) clearTimeout(crossTimer.current);
+        crossTimer.current = setTimeout(() => setCrossVisible(true), SHRINK_MS);
+      }, ARRIVE_MS);
     }, SHUTTER_MS);
   };
 
@@ -934,10 +989,24 @@ export function SpecSheetColumns() {
       ref={mainRef}
       className="relative h-dvh w-full overflow-hidden bg-white"
     >
+      {/* Shrinks into the dock point once the cube has actually parked, the [ X ]
+          taking its place there — and grows back out of that same point once
+          `requestClose` needs it full size again to fly home. Scaled about
+          `dock.x`/`dock.y` rather than faded, so the cube visibly collapses to
+          the spot the [ X ] then occupies instead of just vanishing in place. */}
       <canvas
         ref={canvasRef}
         aria-hidden
         className="pointer-events-none absolute inset-0 h-full w-full"
+        style={{
+          transformOrigin: `${dock.x}px ${dock.y}px`,
+          // A literal 0 is a singular matrix — animating away from it has a stall
+          // baked into Chrome's own matrix interpolation, so growing back out never
+          // matched the smooth shrink that got it there. 0.0001 is invisible but
+          // keeps the matrix invertible, which is all the transition needs.
+          transform: parked ? "scale(0.0001)" : "scale(1)",
+          transition: `transform ${SHRINK_MS}ms cubic-bezier(0.65, 0, 0.35, 1)`,
+        }}
       />
 
       <div
@@ -1261,33 +1330,39 @@ export function SpecSheetColumns() {
         </div>
       )}
 
-      {/* The docked cube is the way back out, plus Escape. Nothing is drawn here —
-          the cube is its own affordance, this is only the hit area over it, live
-          once it has landed so its flight cannot be cut short half way.
-          It is also what tells the cube it is being looked at: the tumble is the only
-          sign this area is live, since there is nothing here to highlight.
+      {/* The way back out, plus Escape. Takes over from the cube once it has shrunk
+          away entirely, in exactly the spot it shrank into — `dock.x`/`dock.y`
+          rather than a fixed inset, so it follows the cube's own dock position (see
+          specSheetBlobRenderer's dockGeometry) instead of drifting off it.
 
-          Centred on `dock.x`/`dock.y` rather than pinned to the corner: the cube's
-          own dock position now follows the title's line (see specSheetBlobRenderer's
-          dockGeometry), not a fixed inset, so the hit area has to follow it too or
-          it drifts off the cube exactly the way it just did. */}
+          Its own fade rather than the cube's: the two are sequential (see
+          CROSS_FADE_MS/SHRINK_MS above), so `crossVisible` and `parked` agree
+          everywhere except the two brief windows where one is mid-transition and
+          the other is deliberately still hidden.
+
+          The same bracketed mark every other link on the page is, so the letters
+          spread apart at rest and close up under the pointer like [ Visit ] does —
+          `mark` itself isn't reused because this is an action, not a destination. */}
       <button
         type="button"
-        onClick={close}
-        onPointerEnter={() => hoverCube(true)}
-        onPointerLeave={() => hoverCube(false)}
+        onClick={requestClose}
         aria-label="Close"
-        // No cursor-pointer: a hand here would swap the dot out for an arrow and read
-        // as the custom cursor breaking. What this area is is announced by the cube
-        // turning, which says more than a hand would.
-        className="absolute h-40 w-40"
+        tabIndex={crossVisible ? undefined : -1}
+        className="mark pointer-events-auto absolute font-mono text-[10px] tracking-[0.2em] text-neutral-400 transition-colors duration-200 hover:text-neutral-900 sm:text-xs"
         style={{
           left: dock.x,
           top: dock.y,
           transform: "translate(-50%, -50%)",
-          pointerEvents: settled ? "auto" : "none",
+          opacity: crossVisible ? 1 : 0,
+          transition: `opacity ${CROSS_FADE_MS}ms linear, color 200ms linear`,
+          pointerEvents: crossVisible ? "auto" : "none",
         }}
-      />
+      >
+        <span aria-hidden className="mark-sizer">
+          [ X ]
+        </span>
+        <span className="mark-label">[ X ]</span>
+      </button>
 
       <SpecSheetDevPanel values={devPanelValues} onChange={handleDevPanelChange} />
     </main>
