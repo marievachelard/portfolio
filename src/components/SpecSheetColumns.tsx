@@ -31,16 +31,31 @@ const SHUTTER_MS = 650;
     there — the ease it flies on covers most of the distance in about this long. */
 const ARRIVE_MS = 650;
 
-/** How long the cube takes to shrink into its dock point once parked, and to
-    grow back out of it when the [ X ] hands back to it. A scale, not a fade —
-    the cube visibly collapses to the point the [ X ] then occupies. */
+/** Every section but About: how long the cube takes to shrink into its dock
+    point once parked, and to grow back out of it when the [ X ] hands back to
+    it. A scale, not a fade — the cube visibly collapses to the point the [ X ]
+    then occupies. About has no such shrink any more — see FILL_MS. */
 const SHRINK_MS = 450;
 
-/** The [ X ]'s own fade, run only once the cube has finished shrinking away —
-    and, on the way back, only before the cube starts growing again. The two
-    are sequential, not a crossfade, so one is always fully gone before the
-    other appears. */
+/** Every section but About: the [ X ]'s own fade, run only once the cube has
+    finished shrinking away — and, on the way back, only before the cube starts
+    growing again. The two are sequential, not a crossfade, so one is always
+    fully gone before the other appears. About's own [ X ] instead runs on the
+    content's own clock — see aboutContentInAt/OutAt below. */
 const CROSS_FADE_MS = 320;
+
+/** About only: how long, once the cube has arrived at the portrait cell as a
+    small cube, it takes to un-crystallise and grow to fill that cell — and,
+    on the way back, how long it takes the [ X ]'s click to be followed by the
+    portrait's own click-preamble finishing (see requestClose). Reuses
+    ARRIVE_MS's own rate of settling (0.0009, the same one `dockFillWidth`
+    grows on) rather than inventing a new one. */
+const FILL_MS = ARRIVE_MS;
+
+/** About only: how long the portrait itself takes to fade out once the [ X ]
+    is clicked — the first beat of closing, before the cube re-crystallises
+    from the liquid that fade-out reveals. */
+const IMAGE_FADE_MS = 320;
 
 /** When the About grid's own lines start sliding into place — the moment the
     cube sets off for its dock, not the title's schedule the grid's content
@@ -492,20 +507,37 @@ export function SpecSheetColumns() {
   // are still out at this point — they only come back once it has landed.
   const [closing, setClosing] = useState(false);
   const stageTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // The cube has actually landed at its dock — as opposed to `docked`, which flips
-  // the moment it sets off flying there. Once true, the cube shrinks into the dock
-  // point; closing runs this back to false first so the cube grows back before it
-  // sets off home.
+  // Every section but About: the cube has actually landed at its dock — as
+  // opposed to `docked`, which flips the moment it sets off flying there. Once
+  // true, the cube shrinks into the dock point; closing runs this back to false
+  // first so the cube grows back before it sets off home. About never sets this
+  // — it grows in place instead (see `dockFillWidth`/`dockFillHeight` on the
+  // renderer target), so its own dock is never small enough to need a shrink.
   const [parked, setParked] = useState(false);
-  // The [ X ] itself, shown only once the cube has finished shrinking away — see
-  // SHRINK_MS/CROSS_FADE_MS above for why this trails `parked` rather than mirroring
-  // it.
+  // Every section but About: the [ X ] itself, shown only once the cube has
+  // finished shrinking away — see SHRINK_MS/CROSS_FADE_MS above for why this
+  // trails `parked` rather than mirroring it. About's own [ X ] instead runs on
+  // the content's own clock (aboutContentInAt/OutAt), not this.
   const [crossVisible, setCrossVisible] = useState(false);
   const arriveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const crossTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // About only: the portrait's own opacity — see its prop comment on
+  // SpecSheetAboutGrid for why it has to be independent of the content fade.
+  // Starts true so a first open has something to fade nothing away from.
+  const [imageVisible, setImageVisible] = useState(true);
+  // About only: the portrait's own cell, one ref per breakpoint variant (only
+  // one is ever actually laid out, per SpecSheetAboutGrid's own `hidden`
+  // classes) — read for its centre (the cube's new dock point) and its size
+  // (what the cube grows to fill once there).
+  const portraitCellSm = useRef<HTMLDivElement | null>(null);
+  const portraitCellXl = useRef<HTMLDivElement | null>(null);
   // Where the cube parks, read from the renderer's own reckoning so the label beside
   // it cannot drift off it on a short window.
   const [dock, setDock] = useState(() => dockGeometry(1440, 900));
+  // The title-relative point every section's dock used to be, and every
+  // section but About's still is — About's own [ X ] stays here even though
+  // the cube itself now docks on the portrait cell instead (`dock` above).
+  const [titleDock, setTitleDock] = useState({ x: 0, y: 0 });
   // Which experience is settled on, and how far the counter's strips have been wound
   // to say so. The position of the photographs is not state: it changes every frame,
   // and re-rendering the page at that rate to move two pictures would be absurd.
@@ -519,6 +551,17 @@ export function SpecSheetColumns() {
   // panel existed; now just the values it settled on, driving the About spec-sheet
   // grid as fixed constants.
   const layoutValues = DEFAULT_DEV_PANEL_VALUES;
+
+  // Whichever of the two portrait cell refs is actually laid out right now —
+  // the other's box is zeroed by its own `hidden` class rather than unmounted,
+  // so "has a width" is what tells them apart, not which one is set.
+  const getPortraitCellRect = () => {
+    const xl = portraitCellXl.current;
+    if (xl && xl.getBoundingClientRect().width > 0) return xl.getBoundingClientRect();
+    const sm = portraitCellSm.current;
+    if (sm && sm.getBoundingClientRect().width > 0) return sm.getBoundingClientRect();
+    return null;
+  };
 
   /**
    * The open section's entries, or null if it has none. Everything that used to name
@@ -670,20 +713,39 @@ export function SpecSheetColumns() {
       // Guarded: measure() also runs from a pointermove that missed, and that is no
       // place to be setting state on every event.
       const base = dockGeometry(window.innerWidth, window.innerHeight);
+      const isAboutOpen =
+        openedRef.current !== null && COLUMNS[openedRef.current] === "About";
       // Overrides dockGeometry's own corner-based x/y: the cube's centre lines up
       // with the title's own vertical centre (same titleSpace box the title itself
       // is now centred in — see the titleSpace comment above), and its right edge
       // is floored to the outer margin line rather than a fixed corner inset, so it
       // never overhangs past it however wide that margin is set.
+      //
+      // Computed unconditionally, About included: the [ X ] stays here (top
+      // right, by the title) regardless of where the cube itself docks — see
+      // `titleDock` below.
       const dvTitleSpace =
         layoutValues.titleTop + TITLE_LINE - layoutValues.marginTop - 1;
-      const dockY = layoutValues.marginTop + 1 + dvTitleSpace / 2;
-      const dockX = window.innerWidth - layoutValues.marginRight - base.reach;
+      const titleDockX = window.innerWidth - layoutValues.marginRight - base.reach;
+      const titleDockY = layoutValues.marginTop + 1 + dvTitleSpace / 2;
+      // About's cube docks on the portrait cell's own centre instead — measured
+      // from the DOM rather than derived, since this renderer has no way to know
+      // the About grid's own layout. Falls back to the title point if the cell
+      // cannot be measured yet (About just opened and SpecSheetAboutGrid has not
+      // laid out on this frame).
+      const cell = isAboutOpen ? getPortraitCellRect() : null;
+      const dockX = cell ? cell.left + cell.width / 2 : titleDockX;
+      const dockY = cell ? cell.top + cell.height / 2 : titleDockY;
       const next = { ...base, x: dockX, y: dockY };
       setDock((was) =>
         was.x === next.x && was.y === next.y && was.reach === next.reach
           ? was
           : next,
+      );
+      setTitleDock((was) =>
+        was.x === titleDockX && was.y === titleDockY
+          ? was
+          : { x: titleDockX, y: titleDockY },
       );
       if (renderer.current) {
         renderer.current.target.dockX = dockX;
@@ -727,11 +789,9 @@ export function SpecSheetColumns() {
     if (arriveTimer.current) clearTimeout(arriveTimer.current);
     if (crossTimer.current) clearTimeout(crossTimer.current);
     // The cube has to be the thing flying home, not the [ X ] — so if it had
-    // already parked and shrunk away, this puts it back at full size before the
-    // flight starts. For About, requestClose calls this at the same moment it
-    // sets the cube growing, so this is what actually starts it; for every
-    // other section requestClose already waited for the grow to finish, so
-    // this is a no-op repeat of what it just did.
+    // already parked and shrunk away (every section but About), this puts it
+    // back at full size before the flight starts. Harmless for About, which
+    // never sets `parked` in the first place.
     setParked(false);
     setCrossVisible(false);
     setClosing(true);
@@ -739,11 +799,14 @@ export function SpecSheetColumns() {
     const letters = COLUMNS[opened].length;
     const isAbout = COLUMNS[opened] === "About";
     const wordsGone = UNTYPE_START + (letters - 1) * UNTYPE_STEP + CUBE_GAP;
-    // About's trip home waits on two things growing at once from this same
-    // instant: the cube itself (SHRINK_MS to grow back) and, once it's done,
-    // the grid's lines sliding back out (ARRIVE_MS, the same span they took
-    // coming in) — they were first to arrive, so they're last to leave.
-    const flightDelay = isAbout ? SHRINK_MS + ARRIVE_MS : wordsGone;
+    // About's own re-crystallising already happened in requestClose's preamble,
+    // before this even ran — so by now the cube is just sitting there, a cube,
+    // at whatever size the portrait cell was. All that is left to wait on is
+    // the content finishing its own exit (aboutLinesOutAt) plus the grid's
+    // lines sliding back out behind it (ARRIVE_MS, the span they took coming
+    // in) — the cube's own trip home, `returning`, shrinks it back to its
+    // column's size as it flies, exactly as it already does for every section.
+    const flightDelay = isAbout ? aboutLinesOutAt + ARRIVE_MS : wordsGone;
 
     stageTimer.current = setTimeout(() => {
       const rr0 = renderer.current;
@@ -763,6 +826,10 @@ export function SpecSheetColumns() {
         // refilling it on the next mouse move would be a flicker for nothing.
         rr.target.returning = false;
         rr.target.crystal = false;
+        // Stale otherwise for whichever section opens next — a fill target only
+        // About ever sets, but nothing else ever clears.
+        rr.target.dockFillWidth = null;
+        rr.target.dockFillHeight = null;
         openedRef.current = null;
         // A click without an intervening move must not reopen the column it just left.
         hovered.current = -1;
@@ -770,42 +837,57 @@ export function SpecSheetColumns() {
     }, flightDelay);
   };
 
-  // What the [ X ] and Escape actually call. The reverse of arriving, beat for
-  // beat: the [ X ] fades out first, then the cube grows back from the dock point
-  // it shrank into.
+  // What the [ X ] and Escape actually call.
   //
-  // About calls close() the instant the cube sets off growing, not once it is
-  // back at full size — mirroring how the title, aside and content all started
-  // arriving at the exact moment the cube started shrinking, not once it had
-  // finished. The cube simply takes longer (SHRINK_MS) than they do, so it is
-  // the last of the four to actually finish, same as on the way in. Every other
-  // section has no such thing to mirror, so it keeps waiting for the grow to
-  // finish first — the cube there really is the only thing on screen.
+  // About: a preamble, not a mirror of arriving — the portrait fades out first
+  // (revealing the liquid it was sitting over), then the cube re-crystallises
+  // on top of that liquid, and only once both have had time to read does the
+  // standard close sequence below begin. Everything after that preamble
+  // (title/content leaving, the grid's lines, the flight home) really is the
+  // same sequence every other section runs, just entered from a cube that is
+  // already sitting there rather than one still mid-shrink.
   //
-  // Caught before the cube has even parked (mid-flight in, or mid-shrink before
-  // the [ X ] itself has shown), there is nothing on screen to wait out, so this
-  // skips straight to whichever step still applies.
+  // Every other section: the reverse of arriving, beat for beat — the [ X ]
+  // fades out first, then the cube grows back from the dock point it shrank
+  // into. Caught before it has even parked (mid-flight in, or mid-shrink
+  // before the [ X ] itself has shown), there is nothing on screen to wait
+  // out, so this skips straight to close().
   const requestClose = () => {
     if (opened === null || closing) return;
     if (arriveTimer.current) clearTimeout(arriveTimer.current);
     if (crossTimer.current) clearTimeout(crossTimer.current);
     if (stageTimer.current) clearTimeout(stageTimer.current);
 
+    if (COLUMNS[opened] === "About") {
+      setImageVisible(false);
+      stageTimer.current = setTimeout(() => {
+        const r = renderer.current;
+        if (r) {
+          // Clearing the fill target here, the same moment it re-crystallises,
+          // is what shrinks it back to the small docked-cube size rather than
+          // re-crystallising at the full size it was just filling the cell at
+          // — `eased.unit` eases toward `dock.unit` once dockFillWidth is gone,
+          // the same smooth shrink SHRINK_MS used to be a CSS transition for.
+          r.target.dockFillWidth = null;
+          r.target.dockFillHeight = null;
+          r.target.crystal = true;
+          r.wake();
+        }
+        stageTimer.current = setTimeout(close, FILL_MS);
+      }, IMAGE_FADE_MS);
+      return;
+    }
+
     if (!parked) {
       close();
       return;
     }
 
-    const isAbout = COLUMNS[opened] === "About";
     const wasShown = crossVisible;
     setCrossVisible(false);
     stageTimer.current = setTimeout(() => {
       setParked(false);
-      if (isAbout) {
-        close();
-      } else {
-        stageTimer.current = setTimeout(close, SHRINK_MS);
-      }
+      stageTimer.current = setTimeout(close, SHRINK_MS);
     }, wasShown ? CROSS_FADE_MS : 0);
   };
 
@@ -882,6 +964,7 @@ export function SpecSheetColumns() {
     // once reads as two unrelated things happening rather than one sequence.
     r.target.crystal = true;
     openedRef.current = hovered.current;
+    const isAbout = COLUMNS[hovered.current] === "About";
     setOpened(hovered.current);
     // A section always opens on its first entry, and on it already: the counter mounts
     // with its strips already wound to it and nothing to transition from. It simply
@@ -891,15 +974,40 @@ export function SpecSheetColumns() {
     setTextIndex(0);
     at.current = 0;
     want.current = 0;
+    // In case a previous visit left it hidden from the close preamble below.
+    if (isAbout) setImageVisible(true);
     r.wake();
     if (stageTimer.current) clearTimeout(stageTimer.current);
     stageTimer.current = setTimeout(() => {
+      // The portrait cell has been mounted (by SpecSheetAboutGrid, rendered the
+      // instant `opened` was set above) for the whole SHUTTER_MS the shutters
+      // just took to clear — plenty of time for it to have laid out, so the
+      // flight about to start already has the right target instead of
+      // snapping to it mid-flight.
+      if (isAbout) remeasure.current?.();
       if (renderer.current) renderer.current.target.docked = true;
       if (arriveTimer.current) clearTimeout(arriveTimer.current);
       arriveTimer.current = setTimeout(() => {
-        setParked(true);
-        if (crossTimer.current) clearTimeout(crossTimer.current);
-        crossTimer.current = setTimeout(() => setCrossVisible(true), SHRINK_MS);
+        const rr = renderer.current;
+        if (isAbout) {
+          // Arrived as a small cube at the portrait cell's centre; now it
+          // un-crystallises and grows to fill that cell, in place — see
+          // dockFillWidth/Height's own comment on the renderer target for why
+          // this isn't just `active` pointed at the cell instead.
+          const cell = getPortraitCellRect();
+          if (rr && cell) {
+            rr.target.dockFillWidth = cell.width;
+            rr.target.dockFillHeight = cell.height;
+          }
+          if (rr) {
+            rr.target.crystal = false;
+            rr.wake();
+          }
+        } else {
+          setParked(true);
+          if (crossTimer.current) clearTimeout(crossTimer.current);
+          crossTimer.current = setTimeout(() => setCrossVisible(true), SHRINK_MS);
+        }
       }, ARRIVE_MS);
     }, SHUTTER_MS);
   };
@@ -908,12 +1016,13 @@ export function SpecSheetColumns() {
   // title and the way back out belong on screen. False the instant it sets off home.
   const settled = opened !== null && !closing;
   const label = opened === null ? "" : COLUMNS[opened];
-  /** When the title's first letter starts typing. About waits for its grid's lines
-      to finish sliding into place (GRID_LINES_AT + ARRIVE_MS — the same instant
-      the cube itself lands, since the lines were timed to land with it); every
-      other section has no grid to wait on, so it keeps the fixed TYPE_START beat. */
+  /** When the title's first letter starts typing. About waits for the cube to
+      have arrived at the portrait cell (SHUTTER_MS + ARRIVE_MS) *and* finished
+      growing to fill it (FILL_MS) — the portrait itself fades in on this same
+      beat, over the liquid that fill just finished revealing. Every other
+      section has no cell to wait on, so it keeps the fixed TYPE_START beat. */
   const titleStartAt =
-    label === "About" ? GRID_LINES_AT + ARRIVE_MS : TYPE_START;
+    label === "About" ? SHUTTER_MS + ARRIVE_MS + FILL_MS : TYPE_START;
   /** When the last letter of the title has landed, and when the rest follows it. */
   const typedAt = titleStartAt + Math.max(0, label.length - 1) * TYPE_STEP;
   const restAt = typedAt + REST_GAP;
@@ -937,11 +1046,11 @@ export function SpecSheetColumns() {
   const aboutContentOutAt = titleUnwindStartAt;
   const aboutContentOutDuration =
     Math.max(0, label.length - 1) * UNTYPE_STEP + TYPE_LETTER_MS;
-  /** The grid's lines wait for the cube, not the content — they answer to it in
-      both directions. It takes SHRINK_MS to grow back from the instant `close`
-      is called, same as the lines took ARRIVE_MS to land from the instant it
-      set off shrinking on the way in. */
-  const aboutLinesOutAt = SHRINK_MS;
+  /** The grid's lines wait for the content to finish leaving before they do —
+      the cube itself already re-crystallised back in requestClose's preamble,
+      before `close` (and `closing`) even started, so there is nothing left of
+      its own for them to wait on this time. First to arrive, last to leave. */
+  const aboutLinesOutAt = aboutContentOutAt + aboutContentOutDuration;
   // The same figure SpecSheetAboutGrid computes for its own "titleSpace" track — the
   // reserved row between the margin line and the first rule under the title. Centring
   // the title in exactly this height, rather than pinning it to a top offset, is what
@@ -1012,16 +1121,59 @@ export function SpecSheetColumns() {
    */
   const shown = entries?.[Math.min(textIndex, entries.length - 1)];
 
+  const isAbout = label === "About";
+  /** About's [ X ] runs on the exact same clock prose1/prose2/legend do (see
+      SpecSheetAboutGrid's own content-fade-in/out) — a `mark`, so it needs its
+      own copy of that treatment rather than reusing content-fade-in/out's
+      className, since it isn't one of SpecSheetAboutGrid's children. Every
+      other section keeps the crossVisible/CROSS_FADE_MS opacity it always
+      has, since it has no content clock to share. */
+  const crossClassName = `${
+    isAbout ? (closing ? "content-fade-out " : "content-fade-in ") : ""
+  }mark pointer-events-auto absolute font-mono text-[10px] tracking-[0.2em] text-neutral-400 transition-colors duration-200 hover:text-neutral-900 sm:text-xs`;
+  const crossStyle: React.CSSProperties = isAbout
+    ? {
+        // The title-relative point, not `dock` — the cube itself now docks on
+        // the portrait cell, but the [ X ] stays where every section's used to
+        // sit, top right by the title.
+        left: titleDock.x,
+        top: titleDock.y,
+        transform: "translate(-50%, -50%)",
+        animationDelay: `${closing ? aboutContentOutAt : titleStartAt}ms`,
+        animationDuration: `${
+          closing ? aboutContentOutDuration : aboutContentInDuration
+        }ms`,
+        pointerEvents: settled ? "auto" : "none",
+      }
+    : {
+        left: dock.x,
+        top: dock.y,
+        transform: "translate(-50%, -50%)",
+        opacity: crossVisible ? 1 : 0,
+        transition: `opacity ${CROSS_FADE_MS}ms linear, color 200ms linear`,
+        pointerEvents: crossVisible ? "auto" : "none",
+      };
+  const crossTabIndex = isAbout
+    ? settled
+      ? undefined
+      : -1
+    : crossVisible
+      ? undefined
+      : -1;
+
   return (
     <main
       ref={mainRef}
       className="relative h-dvh w-full overflow-hidden bg-white"
     >
-      {/* Shrinks into the dock point once the cube has actually parked, the [ X ]
-          taking its place there — and grows back out of that same point once
-          `requestClose` needs it full size again to fly home. Scaled about
-          `dock.x`/`dock.y` rather than faded, so the cube visibly collapses to
-          the spot the [ X ] then occupies instead of just vanishing in place. */}
+      {/* Every section but About: shrinks into the dock point once the cube has
+          actually parked, the [ X ] taking its place there — and grows back out
+          of that same point once `requestClose` needs it full size again to fly
+          home. Scaled about `dock.x`/`dock.y` rather than faded, so the cube
+          visibly collapses to the spot the [ X ] then occupies instead of just
+          vanishing in place. About never sets `parked`, so this stays at
+          `scale(1)` for it the whole time the canvas is doing something else
+          entirely (growing in place to fill the portrait cell — see `open`). */}
       <canvas
         ref={canvasRef}
         aria-hidden
@@ -1113,6 +1265,14 @@ export function SpecSheetColumns() {
           contentInDuration={aboutContentInDuration}
           contentOutAt={aboutContentOutAt}
           contentOutDuration={aboutContentOutDuration}
+          imageVisible={imageVisible}
+          imageFadeMs={IMAGE_FADE_MS}
+          imageCellRefSm={(el) => {
+            portraitCellSm.current = el;
+          }}
+          imageCellRefXl={(el) => {
+            portraitCellXl.current = el;
+          }}
           values={layoutValues}
           prose1={
             <>
@@ -1362,15 +1522,15 @@ export function SpecSheetColumns() {
         </div>
       )}
 
-      {/* The way back out, plus Escape. Takes over from the cube once it has shrunk
-          away entirely, in exactly the spot it shrank into — `dock.x`/`dock.y`
-          rather than a fixed inset, so it follows the cube's own dock position (see
-          specSheetBlobRenderer's dockGeometry) instead of drifting off it.
+      {/* The way back out, plus Escape. `dock.x`/`dock.y` rather than a fixed
+          inset, so it follows the cube's own dock position (see
+          specSheetBlobRenderer's dockGeometry) instead of drifting off it —
+          for About that dock is now the portrait cell's own centre, so this
+          sits over the portrait rather than beside the title.
 
-          Its own fade rather than the cube's: the two are sequential (see
-          CROSS_FADE_MS/SHRINK_MS above), so `crossVisible` and `parked` agree
-          everywhere except the two brief windows where one is mid-transition and
-          the other is deliberately still hidden.
+          About runs it on the content's own clock (see crossClassName/Style
+          above); every other section keeps its own crossVisible-driven fade,
+          timed off the cube instead.
 
           The same bracketed mark every other link on the page is, so the letters
           spread apart at rest and close up under the pointer like [ Visit ] does —
@@ -1379,16 +1539,9 @@ export function SpecSheetColumns() {
         type="button"
         onClick={requestClose}
         aria-label="Close"
-        tabIndex={crossVisible ? undefined : -1}
-        className="mark pointer-events-auto absolute font-mono text-[10px] tracking-[0.2em] text-neutral-400 transition-colors duration-200 hover:text-neutral-900 sm:text-xs"
-        style={{
-          left: dock.x,
-          top: dock.y,
-          transform: "translate(-50%, -50%)",
-          opacity: crossVisible ? 1 : 0,
-          transition: `opacity ${CROSS_FADE_MS}ms linear, color 200ms linear`,
-          pointerEvents: crossVisible ? "auto" : "none",
-        }}
+        tabIndex={crossTabIndex}
+        className={crossClassName}
+        style={crossStyle}
       >
         <span aria-hidden className="mark-sizer">
           [ X ]
