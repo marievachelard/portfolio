@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import type { DevPanelValues } from "@/lib/specSheetDevPanelValues";
+import type { AboutGridLayout } from "@/lib/aboutGridLayout";
 
 /**
  * Every rule on the About "spec sheet" is its own empty grid track — never a border on
@@ -8,9 +8,9 @@ import type { DevPanelValues } from "@/lib/specSheetDevPanelValues";
  * small marker div) or content/space (no marker, just the size it's given).
  *
  * Row layout is one column-independent stack: margin, a rule, the space the title
- * (rendered elsewhere, by the shared title container in SpecSheetColumns.tsx) occupies,
+ * (rendered elsewhere, by the shared title container in LiquidColumns.tsx) occupies,
  * the doubled title/content rule pair, the content row, a rule, the legend row, a rule,
- * margin. `TITLE_LINE_HEIGHT` must match TITLE_LINE in SpecSheetColumns.tsx — it is not
+ * margin. `TITLE_LINE_HEIGHT` must match TITLE_LINE in LiquidColumns.tsx — it is not
  * imported from there to keep this component independent of that file's internals.
  *
  * Breakpoints are Tailwind's own `sm` (640px) and `xl` (1280px), matching every other
@@ -18,7 +18,7 @@ import type { DevPanelValues } from "@/lib/specSheetDevPanelValues";
  */
 const TITLE_LINE_HEIGHT = 60;
 
-export function SpecSheetAboutGrid({
+export function AboutGrid({
   closing,
   linesInAt,
   linesOutAt,
@@ -60,7 +60,7 @@ export function SpecSheetAboutGrid({
   /**
    * The portrait's own opacity, independent of the content fade above. On the
    * way in it stays true the whole time — the content fade already handles it,
-   * arriving with prose/legend. On the way out, SpecSheetColumns flips it false
+   * arriving with prose/legend. On the way out, LiquidColumns flips it false
    * the instant the [ X ] is clicked, well before `closing` (and the content
    * fade-out it drives) even starts: the image has to be gone, revealing the
    * liquid the cube is about to re-crystallise from, before the rest of the
@@ -70,11 +70,11 @@ export function SpecSheetAboutGrid({
   /** How long that fade-out takes. */
   imageFadeMs: number;
   /** Attached to the portrait's own cell (one per breakpoint variant, only one
-      ever laid out at a time) so SpecSheetColumns can measure it — that cell's
+      ever laid out at a time) so LiquidColumns can measure it — that cell's
       centre and size are the cube's dock and fill target. */
   imageCellRefSm: (el: HTMLDivElement | null) => void;
   imageCellRefXl: (el: HTMLDivElement | null) => void;
-  values: DevPanelValues;
+  values: AboutGridLayout;
   prose1: ReactNode;
   image: ReactNode;
   prose2: ReactNode;
@@ -104,9 +104,9 @@ export function SpecSheetAboutGrid({
   return (
     <div aria-hidden className="pointer-events-none absolute inset-0">
       <style>{`
-        .specsheet-about-grid { grid-template-columns: ${colsBase}; }
-        @media (min-width: 640px) { .specsheet-about-grid { grid-template-columns: ${colsSm}; } }
-        @media (min-width: 1280px) { .specsheet-about-grid { grid-template-columns: ${colsXl}; } }
+        .about-grid { grid-template-columns: ${colsBase}; }
+        @media (min-width: 640px) { .about-grid { grid-template-columns: ${colsSm}; } }
+        @media (min-width: 1280px) { .about-grid { grid-template-columns: ${colsXl}; } }
       `}</style>
 
       {/* The lines alone — see grid-lines-in/out in globals.css for the shutters'
@@ -114,17 +114,17 @@ export function SpecSheetAboutGrid({
           wrapper around a subset of the content layer's children: wrapping them
           would pull them out from under the grid container that positions them by
           `gridColumn`/`gridRow`, so instead this is its own full grid, sharing
-          `.specsheet-about-grid`'s column template so the two stay pixel-aligned
+          `.about-grid`'s column template so the two stay pixel-aligned
           without restating it.
 
           `linesOutAt` (not 0) on close: the lines were first to arrive, so they
           wait for the content layer below to finish leaving before they do — see
-          `aboutLinesOutAt`'s comment in SpecSheetColumns.tsx. */}
+          `aboutLinesOutAt`'s comment in LiquidColumns.tsx. */}
       <div
         className={`${closing ? "grid-lines-out" : "grid-lines-in"} absolute inset-0`}
         style={{ animationDelay: `${closing ? linesOutAt : linesInAt}ms` }}
       >
-        <div className="specsheet-about-grid grid h-full" style={{ gridTemplateRows: rows }}>
+        <div className="about-grid grid h-full" style={{ gridTemplateRows: rows }}>
           {/* Horizontal rules, full width regardless of the column template above. */}
           <div style={{ ...RULE, gridRow: "r1 / r2", gridColumn: "1 / -1" }} />
           <div style={{ ...RULE, gridRow: "r4 / r5", gridColumn: "1 / -1" }} />
@@ -169,7 +169,7 @@ export function SpecSheetAboutGrid({
           writing itself in or out, so `contentInDuration`/`contentOutDuration`
           override the class's own fixed duration (inline styles win over the
           shorthand `animation` a class sets, even though duration is normally
-          the class's job — see SpecSheetColumns.tsx for where the numbers come
+          the class's job — see LiquidColumns.tsx for where the numbers come
           from: `aboutContentInDuration` going in, `aboutContentOutDuration`
           coming out). */}
       <div
@@ -179,7 +179,7 @@ export function SpecSheetAboutGrid({
           animationDuration: `${closing ? contentOutDuration : contentInDuration}ms`,
         }}
       >
-        <div className="specsheet-about-grid grid h-full" style={{ gridTemplateRows: rows }}>
+        <div className="about-grid grid h-full" style={{ gridTemplateRows: rows }}>
           {/* Each column reference is valid at every breakpoint it's actually shown
               at — prose1 and the portrait share the same b2/b3 and b8/b9 pair in the
               sm and xl templates; prose2 only exists once xl's template supplies
@@ -198,7 +198,7 @@ export function SpecSheetAboutGrid({
               Its own opacity/transition (imageVisible/imageFadeMs), separate from the
               content-fade-in/out this cell's siblings run on — see imageVisible's own
               comment above for why the two have to be decoupled. The ref is this same
-              cell rather than the image itself: SpecSheetColumns reads its box for both
+              cell rather than the image itself: LiquidColumns reads its box for both
               the cube's dock point and the size it grows to fill. */}
           <div
             ref={imageCellRefSm}

@@ -1,4 +1,4 @@
-export type DevPanelValues = {
+export type AboutGridLayout = {
   marginTop: number;
   marginBottom: number;
   marginLeft: number;
@@ -12,7 +12,7 @@ export type DevPanelValues = {
 
 // The dev panel these were once tuned through is gone; this is just the values
 // it settled on, kept as the fixed layout the About spec sheet renders with.
-export const DEFAULT_DEV_PANEL_VALUES: DevPanelValues = {
+export const ABOUT_GRID_LAYOUT: AboutGridLayout = {
   marginTop: 80,
   marginBottom: 80,
   marginLeft: 80,

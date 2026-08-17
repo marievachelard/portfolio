@@ -37,6 +37,27 @@ export type BlobTarget = {
   /** pointer position, CSS px */
   pointerX: number;
   pointerY: number;
+  /**
+   * Override the docked position dockGeometry() would otherwise compute, CSS px.
+   * `null` (the default) falls back to that built-in corner geometry — this only
+   * exists so the page can line the cube up with something it knows about (the
+   * title's own vertical centre, the margin's own right edge) that this renderer
+   * has no way to know about on its own.
+   */
+  dockX: number | null;
+  dockY: number | null;
+  /**
+   * Override the docked *size*, CSS px — grows the body to this width/height in
+   * place, without it ever flying anywhere, rather than the fixed small cube
+   * `dockGeometry()` otherwise parks. `null` (the default) keeps that fixed size.
+   *
+   * Deliberately not `colWidth`/`colHeight`: those already mean "the column this
+   * body came from," read by `returning` to fly home to the right size — reusing
+   * them here would make the trip home grow into whatever was last docked into
+   * instead of back into its own column.
+   */
+  dockFillWidth: number | null;
+  dockFillHeight: number | null;
 };
 
 export type BlobRenderer = {
@@ -111,11 +132,18 @@ const MAX_DPR = 1.4;
 export function dockGeometry(cssW: number, cssH: number) {
   const unit = Math.min(DOCK_UNIT, cssW * 0.13);
   const reach = unit * CUBE_HALF * 1.45;
-  const inset = Math.max(
+  const insetX = Math.max(
     reach + 14,
     Math.min(DOCK_INSET, cssW * 0.16, cssH * 0.16),
   );
-  return { x: inset, y: inset, unit, reach };
+  // Docks top-right on this page instead of top-left, and its vertical centre is
+  // pinned to the title's own centre rather than a corner inset — 144/192px is
+  // the title container's top-36/sm:top-48 in LiquidColumns.tsx, and 40/60px
+  // is the h1's own line height below/at `sm` (text-4xl's default leading, then
+  // text-6xl's, which TITLE_LINE already documents as exactly 60). Half of each,
+  // added to the top, is the centre of the line.
+  const titleCenterY = cssW >= 640 ? 192 + 30 : 144 + 20;
+  return { x: cssW - insetX, y: titleCenterY, unit, reach };
 }
 
 function compile(gl: WebGL2RenderingContext, type: number, src: string) {
@@ -180,6 +208,10 @@ export function createBlobRenderer(canvas: HTMLCanvasElement): BlobRenderer | nu
     colHeight: 0,
     pointerX: 0,
     pointerY: 0,
+    dockX: null,
+    dockY: null,
+    dockFillWidth: null,
+    dockFillHeight: null,
   };
 
   // Eased state. `x`/`y` are CSS px. There is one body and it changes column in a
@@ -275,9 +307,13 @@ export function createBlobRenderer(canvas: HTMLCanvasElement): BlobRenderer | nu
     // the inset is floored by how far its tilted corners actually project — that is
     // what stops it hanging off the left edge on a phone.
     const dock = dockGeometry(cssW, cssH);
-    const dockX = dock.x;
-    const dockY = dock.y;
-    const wantUnit = target.docked ? dock.unit : wantW / 2;
+    const dockX = target.dockX ?? dock.x;
+    const dockY = target.dockY ?? dock.y;
+    const wantUnit = target.docked
+      ? target.dockFillWidth != null
+        ? target.dockFillWidth / 2
+        : dock.unit
+      : wantW / 2;
 
     if (!seeded && target.active) {
       eased.x = target.colCenterX;
@@ -319,8 +355,21 @@ export function createBlobRenderer(canvas: HTMLCanvasElement): BlobRenderer | nu
       // whole viewport, since there is no column left to be contained by.
       eased.x = ease(eased.x, dockX, 0.0009, dt);
       eased.y = ease(eased.y, dockY, 0.0009, dt);
-      clip.left = 0;
-      clip.right = cssW;
+      // Growing in place to fill a cell, if asked to — the same rate `returning`
+      // grows a cube back to its column at, so a dock that fills reads as the
+      // same kind of motion as a cube flying home, just without the travel.
+      // Clipped to that cell's own width once it does, same as a column clips
+      // its own pillar — the overflow (HALF_X et al.) is deliberate, but only
+      // against edges the cell actually has, not the whole viewport's.
+      if (target.dockFillWidth != null && target.dockFillHeight != null) {
+        eased.width = ease(eased.width, target.dockFillWidth, 0.0009, dt);
+        eased.height = ease(eased.height, target.dockFillHeight, 0.0009, dt);
+        clip.left = dockX - target.dockFillWidth / 2;
+        clip.right = dockX + target.dockFillWidth / 2;
+      } else {
+        clip.left = 0;
+        clip.right = cssW;
+      }
     } else if (target.returning) {
       // The same flight run backwards: home to its column, growing back as it goes,
       // still a cube. Same rate as the way out, so it reads as one move reversed.
@@ -435,6 +484,16 @@ export function createBlobRenderer(canvas: HTMLCanvasElement): BlobRenderer | nu
         // lurch, and mid-flight it would lurch differently every frame.
         target.docked || target.returning ? 0 : (target.pointerX - eased.x) / unit,
         target.docked || target.returning ? 0 : -(target.pointerY - eased.y) / unit,
+        // Filling a cell clips top/bottom to it too, the same way `clip.left/right`
+        // already do — otherwise OVERFLOW_Y spills past a cell the way it never
+        // does past a column, which runs the full height this would rather be
+        // wide open for.
+        target.docked && target.dockFillHeight != null
+          ? dockY - target.dockFillHeight / 2
+          : 0,
+        target.docked && target.dockFillHeight != null
+          ? dockY + target.dockFillHeight / 2
+          : cssH,
       );
   }
 
@@ -457,6 +516,12 @@ export function createBlobRenderer(canvas: HTMLCanvasElement): BlobRenderer | nu
     clipR: number,
     aimX: number,
     aimY: number,
+    // CSS px, top-left origin, matching every other coordinate this renderer
+    // takes from the page. Defaulted wide open: every caller except the one
+    // filling a portrait cell wants the full canvas height, same as uClipY's
+    // own comment in the shader describes.
+    clipTop = 0,
+    clipBottom = cssH,
   ) {
     if (fade < 0.004) return;
 
@@ -473,8 +538,7 @@ export function createBlobRenderer(canvas: HTMLCanvasElement): BlobRenderer | nu
     gl.uniform2f(u.center, body.x * dpr, (cssH - body.y) * dpr);
     gl.uniform1f(u.unit, unit * dpr);
     gl.uniform2f(u.clip, clipL * dpr, clipR * dpr);
-    // Every column here runs the full canvas height — wide open, always.
-    gl.uniform2f(u.clipY, 0, canvas.height);
+    gl.uniform2f(u.clipY, (cssH - clipBottom) * dpr, (cssH - clipTop) * dpr);
     gl.uniform3f(u.half, HALF_X, halfY, HALF_Z);
     gl.uniform1f(u.fade, fade);
     gl.uniform1f(u.cube, body.cube);

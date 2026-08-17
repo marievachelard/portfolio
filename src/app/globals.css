@@ -218,7 +218,7 @@ a {
    function for everything it touches, and each direction needs its own pair.
 
    650ms, not the shutters' 800: this has to land the instant the cube itself
-   does (ARRIVE_MS in SpecSheetColumns.tsx), not on the shutters' own clock. */
+   does (ARRIVE_MS in LiquidColumns.tsx), not on the shutters' own clock. */
 @keyframes grid-lines-slide-in {
   from {
     transform: translateX(-64px);
