@@ -107,8 +107,8 @@ export function SpecSheetGrid({
       main content row, its own `1fr` keeping the legend row pinned to the
       bottom of the section rather than to a short entry's own content. */
   body?: ReactNode;
-  /** 2-column section only: the entry's links — row 6 (`r11`/`r12`), the
-      same row About's own legend occupies but in column B rather than
+  /** 2-column section only: the entry's links — row 6 (`r10`/`r12`), the
+      same span About's own legend occupies but in column B rather than
       centred full width, since these belong to the prose column, not the
       page's centreline. Simply absent on an entry with none. */
   links?: ReactNode;
@@ -259,11 +259,25 @@ export function SpecSheetGrid({
               >
                 {body}
               </div>
-              {/* Row 6 — the legend row (r11/r12), in column B rather than
-                  centred full width the way About's own legend content is:
-                  the links sit under the prose column they belong to, not on
-                  the page's own centreline. */}
-              <div style={{ gridColumn: "b2 / b3", gridRow: "r11 / r12", width: "100%", padding: "0 8px" }}>
+              {/* Row 6 — the same r10/r12 span About's own legend is centred
+                  in (the columnGap gap above the auto row, plus the auto row
+                  itself), in column B rather than centred full width: the
+                  links sit under the prose column they belong to, not on the
+                  page's own centreline. r10/r12, not just the auto row
+                  (r11/r12) alone — that would leave the gap entirely above
+                  the links, reading as bottom-aligned in the space between
+                  the two rules rather than centred in it. */}
+              <div
+                style={{
+                  gridColumn: "b2 / b3",
+                  gridRow: "r10 / r12",
+                  width: "100%",
+                  padding: "0 8px",
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "center",
+                }}
+              >
                 {links}
               </div>
             </>
