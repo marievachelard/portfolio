@@ -1342,7 +1342,7 @@ export function LiquidColumns() {
           links={
             shown.links &&
             entryBlock(
-              <p className="mt-8 flex gap-6">
+              <p className="flex gap-6">
                 {shown.links.map((link) => mark({ ...link, settled }))}
               </p>,
             )

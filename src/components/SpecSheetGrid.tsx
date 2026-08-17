@@ -92,8 +92,8 @@ export function SpecSheetGrid({
   imageCellRefXl?: (el: HTMLDivElement | null) => void;
   values: AboutGridLayout;
   /** Only ever shown on a 3-column section. On a 2-column section, its one
-      prose column is `subtitle` (row 3, between the title's doubled rule)
-      plus `body`/`links` (row 5, the main content row) instead. */
+      prose column is `subtitle` (row 3), `body` (row 5), and `links` (row 6)
+      instead. */
   prose1?: ReactNode;
   image: ReactNode;
   /** Only ever shown on a 3-column section, at `xl`. */
@@ -103,14 +103,14 @@ export function SpecSheetGrid({
       already reserves but only About's placeholder subtitle used to leave
       empty here. */
   subtitle?: ReactNode;
-  /** 2-column section only: the entry's summary, sharing row 5 (`r8`/`r9`)
-      with `links`, which follows it in normal document flow — so links sit
-      directly under the summary whatever its own length, and the row's
-      `1fr` still absorbs the slack so the legend stays pinned to the bottom
-      of the section rather than to a short entry's own content. */
+  /** 2-column section only: the entry's summary — row 5 (`r8`/`r9`), the
+      main content row, its own `1fr` keeping the legend row pinned to the
+      bottom of the section rather than to a short entry's own content. */
   body?: ReactNode;
-  /** 2-column section only: the entry's links, rendered directly after
-      `body` in the same row — simply absent on an entry with none. */
+  /** 2-column section only: the entry's links — row 6 (`r11`/`r12`), the
+      same row About's own legend occupies but in column B rather than
+      centred full width, since these belong to the prose column, not the
+      page's centreline. Simply absent on an entry with none. */
   links?: ReactNode;
   legend: ReactNode;
 }) {
@@ -243,13 +243,14 @@ export function SpecSheetGrid({
               <div style={{ gridColumn: "b2 / b3", gridRow: "r5 / r6", width: "100%", padding: "0 8px" }}>
                 {subtitle}
               </div>
-              {/* body and links share this row rather than each getting their
-                  own: links follows body in normal document flow, so it sits
-                  directly under it whatever the summary's own length turns
-                  out to be, instead of at a fixed distance from the row above
-                  that a short summary would otherwise leave a gap in front of. */}
               <div style={{ gridColumn: "b2 / b3", gridRow: "r8 / r9", width: "100%", padding: "0 8px" }}>
                 {body}
+              </div>
+              {/* Row 6 — the legend row (r11/r12), in column B rather than
+                  centred full width the way About's own legend content is:
+                  the links sit under the prose column they belong to, not on
+                  the page's own centreline. */}
+              <div style={{ gridColumn: "b2 / b3", gridRow: "r11 / r12", width: "100%", padding: "0 8px" }}>
                 {links}
               </div>
             </>
