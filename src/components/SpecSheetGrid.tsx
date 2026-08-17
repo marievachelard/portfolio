@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import type { AboutGridLayout } from "@/lib/aboutGridLayout";
 
 /**
- * Every rule on the About "spec sheet" is its own empty grid track — never a border on
+ * Every rule on a "spec sheet" section is its own empty grid track — never a border on
  * a content cell, which is what let two separate systems draw the same boundary
  * slightly apart earlier in this branch. A track is either a line (1px, painted by a
  * small marker div) or content/space (no marker, just the size it's given).
@@ -13,12 +13,19 @@ import type { AboutGridLayout } from "@/lib/aboutGridLayout";
  * margin. `TITLE_LINE_HEIGHT` must match TITLE_LINE in LiquidColumns.tsx — it is not
  * imported from there to keep this component independent of that file's internals.
  *
+ * `columns` picks the column template: 3 is About's own — two prose columns either
+ * side of the image, switching in a second prose column at `xl` — and 2 is Experience
+ * and Projects', a single prose column and an image that keeps the extra width `xl`
+ * would otherwise have handed to a second column instead. A 2-column section never
+ * renders `prose2`, an `imageCellRefXl`, or the xl-only rules a third column needs.
+ *
  * Breakpoints are Tailwind's own `sm` (640px) and `xl` (1280px), matching every other
  * responsive value already on this page.
  */
 const TITLE_LINE_HEIGHT = 60;
 
-export function AboutGrid({
+export function SpecSheetGrid({
+  columns,
   closing,
   linesInAt,
   linesOutAt,
@@ -36,6 +43,10 @@ export function AboutGrid({
   prose2,
   legend,
 }: {
+  /** 3 for About (prose, image, prose — the third column only at `xl`), 2 for
+      Experience/Projects (prose, image — image keeps the width `xl` would
+      otherwise hand to a second prose column). */
+  columns: 2 | 3;
   closing: boolean;
   /** When the grid's own lines start sliding into place, ms after the section
       opens — driven by the cube setting off for its dock, not by the title. */
@@ -44,7 +55,7 @@ export function AboutGrid({
       content below have both finished leaving, since the lines were first to
       arrive and so are last to go. */
   linesOutAt: number;
-  /** When the content (portrait, prose, legend) starts fading into the grid the
+  /** When the content (image, prose, legend) starts fading into the grid the
       lines already drew — the same instant the title starts typing, so the two
       run as one movement. */
   contentInAt: number;
@@ -58,7 +69,7 @@ export function AboutGrid({
       its aside) finish unwinding. */
   contentOutDuration: number;
   /**
-   * The portrait's own opacity, independent of the content fade above. On the
+   * The image's own opacity, independent of the content fade above. On the
    * way in it stays true the whole time — the content fade already handles it,
    * arriving with prose/legend. On the way out, LiquidColumns flips it false
    * the instant the [ X ] is clicked, well before `closing` (and the content
@@ -69,17 +80,21 @@ export function AboutGrid({
   imageVisible: boolean;
   /** How long that fade-out takes. */
   imageFadeMs: number;
-  /** Attached to the portrait's own cell (one per breakpoint variant, only one
-      ever laid out at a time) so LiquidColumns can measure it — that cell's
-      centre and size are the cube's dock and fill target. */
+  /** Attached to the image's own cell (one per breakpoint variant for a
+      3-column section, only one ever laid out at a time — a 2-column section
+      has only the one, laid out from `sm` up) so LiquidColumns can measure
+      it — that cell's centre and size are the cube's dock and fill target. */
   imageCellRefSm: (el: HTMLDivElement | null) => void;
-  imageCellRefXl: (el: HTMLDivElement | null) => void;
+  /** Unused (and never called) on a 2-column section — see `columns`. */
+  imageCellRefXl?: (el: HTMLDivElement | null) => void;
   values: AboutGridLayout;
   prose1: ReactNode;
   image: ReactNode;
-  prose2: ReactNode;
+  /** Only ever shown on a 3-column section, at `xl`. */
+  prose2?: ReactNode;
   legend: ReactNode;
 }) {
+  const threeCol = columns === 3;
   const halfGap = values.columnGap / 2;
   const titleSpace = values.titleTop + TITLE_LINE_HEIGHT - values.marginTop - 1;
 
@@ -104,9 +119,9 @@ export function AboutGrid({
   return (
     <div aria-hidden className="pointer-events-none absolute inset-0">
       <style>{`
-        .about-grid { grid-template-columns: ${colsBase}; }
-        @media (min-width: 640px) { .about-grid { grid-template-columns: ${colsSm}; } }
-        @media (min-width: 1280px) { .about-grid { grid-template-columns: ${colsXl}; } }
+        .spec-sheet-grid { grid-template-columns: ${colsBase}; }
+        @media (min-width: 640px) { .spec-sheet-grid { grid-template-columns: ${colsSm}; } }
+        ${threeCol ? `@media (min-width: 1280px) { .spec-sheet-grid { grid-template-columns: ${colsXl}; } }` : ""}
       `}</style>
 
       {/* The lines alone — see grid-lines-in/out in globals.css for the shutters'
@@ -114,7 +129,7 @@ export function AboutGrid({
           wrapper around a subset of the content layer's children: wrapping them
           would pull them out from under the grid container that positions them by
           `gridColumn`/`gridRow`, so instead this is its own full grid, sharing
-          `.about-grid`'s column template so the two stay pixel-aligned
+          `.spec-sheet-grid`'s column template so the two stay pixel-aligned
           without restating it.
 
           `linesOutAt` (not 0) on close: the lines were first to arrive, so they
@@ -124,7 +139,7 @@ export function AboutGrid({
         className={`${closing ? "grid-lines-out" : "grid-lines-in"} absolute inset-0`}
         style={{ animationDelay: `${closing ? linesOutAt : linesInAt}ms` }}
       >
-        <div className="about-grid grid h-full" style={{ gridTemplateRows: rows }}>
+        <div className="spec-sheet-grid grid h-full" style={{ gridTemplateRows: rows }}>
           {/* Horizontal rules, full width regardless of the column template above. */}
           <div style={{ ...RULE, gridRow: "r1 / r2", gridColumn: "1 / -1" }} />
           <div style={{ ...RULE, gridRow: "r4 / r5", gridColumn: "1 / -1" }} />
@@ -138,24 +153,32 @@ export function AboutGrid({
 
           {/* The right margin line's own position is the one thing that genuinely
               differs by breakpoint (the base and sm templates end sooner than xl's),
-              so it needs one variant per template, each hidden outside its own range. */}
+              so it needs one variant per template, each hidden outside its own range.
+              A 2-column section never switches to the xl template, so its sm-range
+              variant simply stays visible past 1280px instead of handing off. */}
           <div className="sm:hidden" style={{ ...RULE, gridColumn: "b3 / b4", gridRow: "1 / -1" }} />
           <div
-            className="hidden sm:block xl:hidden"
+            className={threeCol ? "hidden sm:block xl:hidden" : "hidden sm:block"}
             style={{ ...RULE, gridColumn: "b9 / b10", gridRow: "1 / -1" }}
           />
-          <div className="hidden xl:block" style={{ ...RULE, gridColumn: "b15 / b16", gridRow: "1 / -1" }} />
+          {threeCol && (
+            <div className="hidden xl:block" style={{ ...RULE, gridColumn: "b15 / b16", gridRow: "1 / -1" }} />
+          )}
 
-          {/* Doubled pair flanking the portrait's left edge — visible from `sm`, where
+          {/* Doubled pair flanking the image's left edge — visible from `sm`, where
               b4/b5 and b6/b7 both exist and mean the same thing in the sm and xl
-              templates (they diverge only after the portrait). */}
+              templates (they diverge only after the image). */}
           <div className="hidden sm:block" style={{ ...RULE, gridColumn: "b4 / b5", gridRow: "1 / -1" }} />
           <div className="hidden sm:block" style={{ ...RULE, gridColumn: "b6 / b7", gridRow: "1 / -1" }} />
 
-          {/* Doubled pair flanking the portrait's right edge — only exists once the
-              third column appears, at `xl`. */}
-          <div className="hidden xl:block" style={{ ...RULE, gridColumn: "b10 / b11", gridRow: "1 / -1" }} />
-          <div className="hidden xl:block" style={{ ...RULE, gridColumn: "b12 / b13", gridRow: "1 / -1" }} />
+          {/* Doubled pair flanking the image's right edge — only exists once a third
+              column appears, at `xl` on a 3-column section. */}
+          {threeCol && (
+            <>
+              <div className="hidden xl:block" style={{ ...RULE, gridColumn: "b10 / b11", gridRow: "1 / -1" }} />
+              <div className="hidden xl:block" style={{ ...RULE, gridColumn: "b12 / b13", gridRow: "1 / -1" }} />
+            </>
+          )}
         </div>
       </div>
 
@@ -179,30 +202,41 @@ export function AboutGrid({
           animationDuration: `${closing ? contentOutDuration : contentInDuration}ms`,
         }}
       >
-        <div className="about-grid grid h-full" style={{ gridTemplateRows: rows }}>
+        <div className="spec-sheet-grid grid h-full" style={{ gridTemplateRows: rows }}>
           {/* Each column reference is valid at every breakpoint it's actually shown
-              at — prose1 and the portrait share the same b2/b3 and b8/b9 pair in the
+              at — prose1 and the image share the same b2/b3 and b8/b9 pair in the
               sm and xl templates; prose2 only exists once xl's template supplies
-              b14/b15. */}
+              b14/b15, on a 3-column section. */}
           <div style={{ gridColumn: "b2 / b3", gridRow: "r8 / r9", width: "100%", padding: "0 8px" }}>
             {prose1}
           </div>
           {/* The image spans into the padding tracks on every side it has one, touching
               the surrounding rules directly instead of stopping at the narrower content
               track — "fills the cell" means the area between the rules, not just the
-              1fr track inside it. Two variants: two-column mode's image already touches
-              the outer right margin line directly (no padding track past it, by design
-              — see the doubled-pair comment above), so only its left side gains the
-              extra span; three-column mode gains it on both sides.
+              1fr track inside it. Two variants on a 3-column section: two-column mode's
+              image already touches the outer right margin line directly (no padding
+              track past it, by design — see the doubled-pair comment above), so only
+              its left side gains the extra span; three-column mode gains it on both
+              sides. A 2-column section only ever renders the one variant, kept laid
+              out (rather than swapped for an xl-only sibling) past 1280px too.
 
               Its own opacity/transition (imageVisible/imageFadeMs), separate from the
               content-fade-in/out this cell's siblings run on — see imageVisible's own
               comment above for why the two have to be decoupled. The ref is this same
               cell rather than the image itself: LiquidColumns reads its box for both
-              the cube's dock point and the size it grows to fill. */}
+              the cube's dock point and the size it grows to fill.
+
+              `overflow-hidden`: About's own single, static image never needed it, but
+              Experience/Projects' photo strip slides its neighbours through this same
+              cell on the way to and from the one on screen — without a clip they slide
+              past the cell's own edges, over the rules meant to frame it. */}
           <div
             ref={imageCellRefSm}
-            className="relative hidden sm:block xl:hidden"
+            className={
+              threeCol
+                ? "relative hidden overflow-hidden sm:block xl:hidden"
+                : "relative hidden overflow-hidden sm:block"
+            }
             style={{
               gridColumn: "b7 / b9",
               gridRow: "r7 / r10",
@@ -212,18 +246,20 @@ export function AboutGrid({
           >
             {image}
           </div>
-          <div
-            ref={imageCellRefXl}
-            className="relative hidden xl:block"
-            style={{
-              gridColumn: "b7 / b10",
-              gridRow: "r7 / r10",
-              opacity: imageVisible ? 1 : 0,
-              transition: `opacity ${imageFadeMs}ms linear`,
-            }}
-          >
-            {image}
-          </div>
+          {threeCol && (
+            <div
+              ref={imageCellRefXl}
+              className="relative hidden overflow-hidden xl:block"
+              style={{
+                gridColumn: "b7 / b10",
+                gridRow: "r7 / r10",
+                opacity: imageVisible ? 1 : 0,
+                transition: `opacity ${imageFadeMs}ms linear`,
+              }}
+            >
+              {image}
+            </div>
+          )}
           {/* b13 / b15, not b14 / b15: prose1 sits directly against its own nearest
               visible line (lineL, no padding track between them), so its 8px padding
               reads as "8px from the line." Prose2's nearest visible line (lineB2) has
@@ -232,12 +268,14 @@ export function AboutGrid({
               invisible boundary, landing the text ~28px from the line instead of 8.
               Spanning from b13 folds the halfGap into this box so the padding is
               measured from the same place prose1's is: the visible line itself. */}
-          <div
-            className="hidden xl:block"
-            style={{ gridColumn: "b13 / b15", gridRow: "r8 / r9", width: "100%", padding: "0 8px" }}
-          >
-            {prose2}
-          </div>
+          {threeCol && (
+            <div
+              className="hidden xl:block"
+              style={{ gridColumn: "b13 / b15", gridRow: "r8 / r9", width: "100%", padding: "0 8px" }}
+            >
+              {prose2}
+            </div>
+          )}
           {/* Centred on both axes within its cell — full width, flexed rather than
               text-align, so the vertical centring (align-items) and the horizontal
               (justify-content) come from the same mechanism. Spans r10/r12, not just

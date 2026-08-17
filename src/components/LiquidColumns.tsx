@@ -17,12 +17,18 @@ import poolside from "@/images/experience/rooftop-pool-palms.jpg";
 import stage from "@/images/experience/open-air-stage.jpg";
 import dome from "@/images/experience/toulouse-garonne-dome.jpg";
 import portrait from "@/images/about/marie-vachelard.jpg";
-import { AboutGrid } from "@/components/AboutGrid";
+import { SpecSheetGrid } from "@/components/SpecSheetGrid";
 import { ABOUT_GRID_LAYOUT } from "@/lib/aboutGridLayout";
 import shopfront from "@/images/projects/shop-window-paintings.jpg";
 import ridge from "@/images/projects/mountain-ridge-hiker.jpg";
 
 const COLUMNS = ["About", "Experience", "Projects", "Contact"];
+
+/** Sections whose open layout is the ruled "spec sheet" grid, with a cube that flies
+    to and fills an image cell — About's portrait, Experience's and Projects' current
+    photograph. Contact has no image and keeps the plain title-container layout, its
+    cube shrinking to a parked dot instead. */
+const GRID_SECTIONS = new Set(["About", "Experience", "Projects"]);
 
 /** How long the shutters take to clear the frame before the cube is released. */
 const SHUTTER_MS = 650;
@@ -156,11 +162,9 @@ const EXPERIENCE: Entry[] = [
  * two places a project can be gone to: the thing itself, and the repository it was
  * built in.
  *
- * The summaries are shorter than an experience's, and by five lines rather than seven.
- * A project spends the other two lines on its row of links: BLOCK_H is shared with
- * Experience — it has to be, or the photograph would rest at a different height in each
- * section — and mt-8 plus a line of mono is 48px of the 182 that block reserves for
- * prose. Five lines is about 350 characters at this measure.
+ * The summaries are shorter than an experience's, and by five lines rather than seven —
+ * a project spends the other two lines on its own row of links. Five lines is about
+ * 350 characters at this measure.
  */
 const PROJECTS: Entry[] = [
   {
@@ -329,54 +333,21 @@ const UNTYPE_STEP = 40;
 /** Beat between the last letter leaving and the cube moving. */
 const CUBE_GAP = 120;
 
-/**
- * Where the photograph rests, CSS px down the page: on the middle of the block of
- * words, rather than on the middle of the window as it was.
- *
- * Derived rather than measured, and the parts check out against the DOM: the title
- * sits at top-48, its 6xl line is 60 tall, and mt-16 separates it from the block —
- * which puts the block at 316 and its middle at 455.
- *
- * BLOCK_H is reserved on the block for a reason. Entries run six or seven lines, and
- * without a floor the middle of a six-line one sits 13px higher: the photograph's
- * resting place would move under it, and the whole strip would jump the moment the
- * wording changed.
- */
-const TITLE_TOP = 192;
 const TITLE_LINE = 60;
-const BLOCK_GAP = 64;
+
+/** Contact's own reserved content height — the same figure Experience and Projects
+    used to share with it before they moved into the grid, kept here since Contact
+    still uses the plain title-container layout the figure was sized for. */
 const BLOCK_H = 278;
-const IMAGE_REST_Y = TITLE_TOP + TITLE_LINE + BLOCK_GAP + BLOCK_H / 2;
 
 /**
- * What to tell the browser about the width of a photograph in the frame. The frame is
- * the photographs' own 3:4, so nothing is cropped and this is simply the frame's width:
- * its `26vw` up to the 320px it stops at, which it reaches at a 1231px window.
- *
- * The frame's third term, the one that shrinks it on a short window, is left out. A
- * `sizes` cannot see the height of the window, and leaving it out errs towards asking
- * for a larger picture than is needed rather than a smaller one.
+ * What to tell the browser about the width of a photograph in its grid cell. The cell
+ * is roughly half the content width between the margins (a `1fr` track alongside
+ * prose's own `1fr`), so this is an approximation rather than a figure read off the
+ * grid's own numbers — good enough for the browser's own picking between the
+ * photographs' existing responsive breakpoints, not a layout-affecting value itself.
  */
-const IMAGE_SIZES = "(min-width: 1231px) 320px, 26vw";
-
-/**
- * Where the measure ends, and so where the half of the line the photograph has to itself
- * begins: the columns' own `left-20` gutter plus the width the prose is held to.
- *
- * The photograph used to be pinned a fixed 160px in from the right edge, put there to
- * keep it nearer the text than the frame. A fixed number cannot do that: how much white
- * it leaves on the near side depends on the measure and on how wide the picture is that
- * day, and by the end it was leaving well over twice as much there as on the far side —
- * the picture read as pushed up against the right edge rather than as sitting in its
- * half of the page. Centred in that half instead, it is the same intent expressed as a
- * relation rather than as a number, and it survives both of those changing.
- *
- * That makes this figure the prose's `max-w-[min(48ch,44vw)]`, and the two have to be
- * changed together. `ch` resolves here the same as it does there — both are on the
- * inherited 16px, the prose only dropping to `text-sm` below `sm`, where the photograph
- * is not shown at all.
- */
-const MEASURE_END = "calc(5rem + min(48ch, 44vw))";
+const IMAGE_SIZES = "45vw";
 
 /**
  * How far the foot of the page sits above the bottom edge. It is the columns' own
@@ -385,7 +356,7 @@ const MEASURE_END = "calc(5rem + min(48ch, 44vw))";
  * own choosing.
  */
 // FOOT and the About block's own height calc (ABOUT_BLOCK_H) are gone: the unified
-// AboutGrid now sizes the legend row from its own row tracks (marginBottom,
+// SpecSheetGrid now sizes the legend row from its own row tracks (marginBottom,
 // the `1fr` content row) rather than a calc() derived from these constants.
 
 /**
@@ -521,22 +492,23 @@ export function LiquidColumns() {
   const [crossVisible, setCrossVisible] = useState(false);
   const arriveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const crossTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // About only: the portrait's own opacity — see its prop comment on
-  // AboutGrid for why it has to be independent of the content fade.
+  // Grid sections only: the image's own opacity — see its prop comment on
+  // SpecSheetGrid for why it has to be independent of the content fade.
   // Starts true so a first open has something to fade nothing away from.
   const [imageVisible, setImageVisible] = useState(true);
-  // About only: the portrait's own cell, one ref per breakpoint variant (only
-  // one is ever actually laid out, per AboutGrid's own `hidden`
-  // classes) — read for its centre (the cube's new dock point) and its size
-  // (what the cube grows to fill once there).
-  const portraitCellSm = useRef<HTMLDivElement | null>(null);
-  const portraitCellXl = useRef<HTMLDivElement | null>(null);
+  // Grid sections only: the open section's image cell, one ref per breakpoint
+  // variant (only one is ever actually laid out, per SpecSheetGrid's own
+  // `hidden` classes) — read for its centre (the cube's new dock point) and
+  // its size (what the cube grows to fill once there). Shared by all three
+  // grid sections, since only one is ever open at a time.
+  const imageCellSm = useRef<HTMLDivElement | null>(null);
+  const imageCellXl = useRef<HTMLDivElement | null>(null);
   // Where the cube parks, read from the renderer's own reckoning so the label beside
   // it cannot drift off it on a short window.
   const [dock, setDock] = useState(() => dockGeometry(1440, 900));
-  // The title-relative point every section's dock used to be, and every
-  // section but About's still is — About's own [ X ] stays here even though
-  // the cube itself now docks on the portrait cell instead (`dock` above).
+  // The title-relative point every section's dock used to be, and Contact's
+  // still is — a grid section's own [ X ] stays here too even though the cube
+  // itself now docks on the image cell instead (`dock` above).
   const [titleDock, setTitleDock] = useState({ x: 0, y: 0 });
   // Which experience is settled on, and how far the counter's strips have been wound
   // to say so. The position of the photographs is not state: it changes every frame,
@@ -552,13 +524,14 @@ export function LiquidColumns() {
   // grid as fixed constants.
   const layoutValues = ABOUT_GRID_LAYOUT;
 
-  // Whichever of the two portrait cell refs is actually laid out right now —
-  // the other's box is zeroed by its own `hidden` class rather than unmounted,
-  // so "has a width" is what tells them apart, not which one is set.
-  const getPortraitCellRect = () => {
-    const xl = portraitCellXl.current;
+  // Whichever of the two image cell refs is actually laid out right now — the
+  // other's box is zeroed by its own `hidden` class rather than unmounted, so
+  // "has a width" is what tells them apart, not which one is set. A
+  // 2-column section only ever lays out the "sm" one.
+  const getImageCellRect = () => {
+    const xl = imageCellXl.current;
     if (xl && xl.getBoundingClientRect().width > 0) return xl.getBoundingClientRect();
-    const sm = portraitCellSm.current;
+    const sm = imageCellSm.current;
     if (sm && sm.getBoundingClientRect().width > 0) return sm.getBoundingClientRect();
     return null;
   };
@@ -713,27 +686,27 @@ export function LiquidColumns() {
       // Guarded: measure() also runs from a pointermove that missed, and that is no
       // place to be setting state on every event.
       const base = dockGeometry(window.innerWidth, window.innerHeight);
-      const isAboutOpen =
-        openedRef.current !== null && COLUMNS[openedRef.current] === "About";
+      const isGridOpen =
+        openedRef.current !== null && GRID_SECTIONS.has(COLUMNS[openedRef.current]);
       // Overrides dockGeometry's own corner-based x/y: the cube's centre lines up
       // with the title's own vertical centre (same titleSpace box the title itself
       // is now centred in — see the titleSpace comment above), and its right edge
       // is floored to the outer margin line rather than a fixed corner inset, so it
       // never overhangs past it however wide that margin is set.
       //
-      // Computed unconditionally, About included: the [ X ] stays here (top
-      // right, by the title) regardless of where the cube itself docks — see
-      // `titleDock` below.
+      // Computed unconditionally, grid sections included: the [ X ] stays here
+      // (top right, by the title) regardless of where the cube itself docks —
+      // see `titleDock` below.
       const dvTitleSpace =
         layoutValues.titleTop + TITLE_LINE - layoutValues.marginTop - 1;
       const titleDockX = window.innerWidth - layoutValues.marginRight - base.reach;
       const titleDockY = layoutValues.marginTop + 1 + dvTitleSpace / 2;
-      // About's cube docks on the portrait cell's own centre instead — measured
-      // from the DOM rather than derived, since this renderer has no way to know
-      // the About grid's own layout. Falls back to the title point if the cell
-      // cannot be measured yet (About just opened and AboutGrid has not
-      // laid out on this frame).
-      const cell = isAboutOpen ? getPortraitCellRect() : null;
+      // A grid section's cube docks on its image cell's own centre instead —
+      // measured from the DOM rather than derived, since this renderer has no
+      // way to know the grid's own layout. Falls back to the title point if
+      // the cell cannot be measured yet (the section just opened and
+      // SpecSheetGrid has not laid out on this frame).
+      const cell = isGridOpen ? getImageCellRect() : null;
       const dockX = cell ? cell.left + cell.width / 2 : titleDockX;
       const dockY = cell ? cell.top + cell.height / 2 : titleDockY;
       const next = { ...base, x: dockX, y: dockY };
@@ -779,13 +752,13 @@ export function LiquidColumns() {
   // otherwise put `label` and this "close" half of the timing after the function
   // that reads them.
   const label = opened === null ? "" : COLUMNS[opened];
-  /** When the title starts unwinding on close. About starts the instant `close`
-      is called — which requestClose now times to the cube setting off growing,
-      not to it finishing — the same way the title started typing the instant
-      the cube set off shrinking, not once it had finished. Every other section
-      keeps the fixed UNTYPE_START beat, since requestClose still waits for
-      their grow to finish first. */
-  const titleUnwindStartAt = label === "About" ? 0 : UNTYPE_START;
+  /** When the title starts unwinding on close. A grid section starts the instant
+      `close` is called — which requestClose now times to the cube setting off
+      growing, not to it finishing — the same way the title started typing the
+      instant the cube set off shrinking, not once it had finished. Contact
+      keeps the fixed UNTYPE_START beat, since requestClose still waits for its
+      grow to finish first. */
+  const titleUnwindStartAt = GRID_SECTIONS.has(label) ? 0 : UNTYPE_START;
   /**
    * The content fade points at the same clock the title's own per-letter unwind
    * does (titleUnwindStartAt/UNTYPE_STEP instead of TYPE_START/TYPE_STEP's), so
@@ -815,24 +788,25 @@ export function LiquidColumns() {
     if (arriveTimer.current) clearTimeout(arriveTimer.current);
     if (crossTimer.current) clearTimeout(crossTimer.current);
     // The cube has to be the thing flying home, not the [ X ] — so if it had
-    // already parked and shrunk away (every section but About), this puts it
-    // back at full size before the flight starts. Harmless for About, which
+    // already parked and shrunk away (Contact only), this puts it back at
+    // full size before the flight starts. Harmless for a grid section, which
     // never sets `parked` in the first place.
     setParked(false);
     setCrossVisible(false);
     setClosing(true);
 
     const letters = COLUMNS[opened].length;
-    const isAbout = COLUMNS[opened] === "About";
+    const isGrid = GRID_SECTIONS.has(COLUMNS[opened]);
     const wordsGone = UNTYPE_START + (letters - 1) * UNTYPE_STEP + CUBE_GAP;
-    // About's own re-crystallising already happened in requestClose's preamble,
-    // before this even ran — so by now the cube is just sitting there, a cube,
-    // at whatever size the portrait cell was. All that is left to wait on is
-    // the content finishing its own exit (aboutLinesOutAt) plus the grid's
-    // lines sliding back out behind it (ARRIVE_MS, the span they took coming
-    // in) — the cube's own trip home, `returning`, shrinks it back to its
-    // column's size as it flies, exactly as it already does for every section.
-    const flightDelay = isAbout ? aboutLinesOutAt + ARRIVE_MS : wordsGone;
+    // A grid section's own re-crystallising already happened in requestClose's
+    // preamble, before this even ran — so by now the cube is just sitting
+    // there, a cube, at whatever size its image cell was. All that is left to
+    // wait on is the content finishing its own exit (aboutLinesOutAt) plus the
+    // grid's lines sliding back out behind it (ARRIVE_MS, the span they took
+    // coming in) — the cube's own trip home, `returning`, shrinks it back to
+    // its column's size as it flies, exactly as it already does for every
+    // section.
+    const flightDelay = isGrid ? aboutLinesOutAt + ARRIVE_MS : wordsGone;
 
     stageTimer.current = setTimeout(() => {
       const rr0 = renderer.current;
@@ -865,26 +839,26 @@ export function LiquidColumns() {
 
   // What the [ X ] and Escape actually call.
   //
-  // About: a preamble, not a mirror of arriving — the portrait fades out first
-  // (revealing the liquid it was sitting over), then the cube re-crystallises
-  // on top of that liquid, and only once both have had time to read does the
-  // standard close sequence below begin. Everything after that preamble
-  // (title/content leaving, the grid's lines, the flight home) really is the
-  // same sequence every other section runs, just entered from a cube that is
+  // A grid section: a preamble, not a mirror of arriving — the image fades out
+  // first (revealing the liquid it was sitting over), then the cube
+  // re-crystallises on top of that liquid, and only once both have had time to
+  // read does the standard close sequence below begin. Everything after that
+  // preamble (title/content leaving, the grid's lines, the flight home) really
+  // is the same sequence Contact runs, just entered from a cube that is
   // already sitting there rather than one still mid-shrink.
   //
-  // Every other section: the reverse of arriving, beat for beat — the [ X ]
-  // fades out first, then the cube grows back from the dock point it shrank
-  // into. Caught before it has even parked (mid-flight in, or mid-shrink
-  // before the [ X ] itself has shown), there is nothing on screen to wait
-  // out, so this skips straight to close().
+  // Contact: the reverse of arriving, beat for beat — the [ X ] fades out
+  // first, then the cube grows back from the dock point it shrank into.
+  // Caught before it has even parked (mid-flight in, or mid-shrink before the
+  // [ X ] itself has shown), there is nothing on screen to wait out, so this
+  // skips straight to close().
   const requestClose = () => {
     if (opened === null || closing) return;
     if (arriveTimer.current) clearTimeout(arriveTimer.current);
     if (crossTimer.current) clearTimeout(crossTimer.current);
     if (stageTimer.current) clearTimeout(stageTimer.current);
 
-    if (COLUMNS[opened] === "About") {
+    if (GRID_SECTIONS.has(COLUMNS[opened])) {
       setImageVisible(false);
       stageTimer.current = setTimeout(() => {
         const r = renderer.current;
@@ -990,7 +964,7 @@ export function LiquidColumns() {
     // once reads as two unrelated things happening rather than one sequence.
     r.target.crystal = true;
     openedRef.current = hovered.current;
-    const isAbout = COLUMNS[hovered.current] === "About";
+    const isGrid = GRID_SECTIONS.has(COLUMNS[hovered.current]);
     setOpened(hovered.current);
     // A section always opens on its first entry, and on it already: the counter mounts
     // with its strips already wound to it and nothing to transition from. It simply
@@ -1001,26 +975,26 @@ export function LiquidColumns() {
     at.current = 0;
     want.current = 0;
     // In case a previous visit left it hidden from the close preamble below.
-    if (isAbout) setImageVisible(true);
+    if (isGrid) setImageVisible(true);
     r.wake();
     if (stageTimer.current) clearTimeout(stageTimer.current);
     stageTimer.current = setTimeout(() => {
-      // The portrait cell has been mounted (by AboutGrid, rendered the
+      // The image cell has been mounted (by SpecSheetGrid, rendered the
       // instant `opened` was set above) for the whole SHUTTER_MS the shutters
       // just took to clear — plenty of time for it to have laid out, so the
       // flight about to start already has the right target instead of
       // snapping to it mid-flight.
-      if (isAbout) remeasure.current?.();
+      if (isGrid) remeasure.current?.();
       if (renderer.current) renderer.current.target.docked = true;
       if (arriveTimer.current) clearTimeout(arriveTimer.current);
       arriveTimer.current = setTimeout(() => {
         const rr = renderer.current;
-        if (isAbout) {
-          // Arrived as a small cube at the portrait cell's centre; now it
+        if (isGrid) {
+          // Arrived as a small cube at the image cell's centre; now it
           // un-crystallises and grows to fill that cell, in place — see
           // dockFillWidth/Height's own comment on the renderer target for why
           // this isn't just `active` pointed at the cell instead.
-          const cell = getPortraitCellRect();
+          const cell = getImageCellRect();
           if (rr && cell) {
             rr.target.dockFillWidth = cell.width;
             rr.target.dockFillHeight = cell.height;
@@ -1041,13 +1015,13 @@ export function LiquidColumns() {
   // The section is open and staying open: the cube is parked in the corner, so the
   // title and the way back out belong on screen. False the instant it sets off home.
   const settled = opened !== null && !closing;
-  /** When the title's first letter starts typing. About waits for the cube to
-      have arrived at the portrait cell (SHUTTER_MS + ARRIVE_MS) *and* finished
-      growing to fill it (FILL_MS) — the portrait itself fades in on this same
-      beat, over the liquid that fill just finished revealing. Every other
-      section has no cell to wait on, so it keeps the fixed TYPE_START beat. */
+  /** When the title's first letter starts typing. A grid section waits for the
+      cube to have arrived at its image cell (SHUTTER_MS + ARRIVE_MS) *and*
+      finished growing to fill it (FILL_MS) — the image itself fades in on
+      this same beat, over the liquid that fill just finished revealing.
+      Contact has no cell to wait on, so it keeps the fixed TYPE_START beat. */
   const titleStartAt =
-    label === "About" ? SHUTTER_MS + ARRIVE_MS + FILL_MS : TYPE_START;
+    GRID_SECTIONS.has(label) ? SHUTTER_MS + ARRIVE_MS + FILL_MS : TYPE_START;
   /** When the last letter of the title has landed, and when the rest follows it. */
   const typedAt = titleStartAt + Math.max(0, label.length - 1) * TYPE_STEP;
   const restAt = typedAt + REST_GAP;
@@ -1056,7 +1030,7 @@ export function LiquidColumns() {
       the title's last letter — and its aside, which lands on the same beat — are
       fully in. Depends on the label's own length, same as typedAt does. */
   const aboutContentInDuration = typedAt + TYPE_LETTER_MS - titleStartAt;
-  // The same figure AboutGrid computes for its own "titleSpace" track — the
+  // The same figure SpecSheetGrid computes for its own "titleSpace" track — the
   // reserved row between the margin line and the first rule under the title. Centring
   // the title in exactly this height, rather than pinning it to a top offset, is what
   // `titleTop` actually moves: not the title's own position, but how much of this
@@ -1126,20 +1100,20 @@ export function LiquidColumns() {
    */
   const shown = entries?.[Math.min(textIndex, entries.length - 1)];
 
-  const isAbout = label === "About";
-  /** About's [ X ] runs on the exact same clock prose1/prose2/legend do (see
-      AboutGrid's own content-fade-in/out) — a `mark`, so it needs its
-      own copy of that treatment rather than reusing content-fade-in/out's
-      className, since it isn't one of AboutGrid's children. Every
-      other section keeps the crossVisible/CROSS_FADE_MS opacity it always
-      has, since it has no content clock to share. */
+  const isGrid = GRID_SECTIONS.has(label);
+  /** A grid section's [ X ] runs on the exact same clock prose1/prose2/legend
+      do (see SpecSheetGrid's own content-fade-in/out) — a `mark`, so it needs
+      its own copy of that treatment rather than reusing content-fade-in/out's
+      className, since it isn't one of SpecSheetGrid's children. Contact keeps
+      the crossVisible/CROSS_FADE_MS opacity it always has, since it has no
+      content clock to share. */
   const crossClassName = `${
-    isAbout ? (closing ? "content-fade-out " : "content-fade-in ") : ""
+    isGrid ? (closing ? "content-fade-out " : "content-fade-in ") : ""
   }mark pointer-events-auto absolute font-mono text-[10px] tracking-[0.2em] text-neutral-400 transition-colors duration-200 hover:text-neutral-900 sm:text-xs`;
-  const crossStyle: React.CSSProperties = isAbout
+  const crossStyle: React.CSSProperties = isGrid
     ? {
         // The title-relative point, not `dock` — the cube itself now docks on
-        // the portrait cell, but the [ X ] stays where every section's used to
+        // the image cell, but the [ X ] stays where every section's used to
         // sit, top right by the title.
         left: titleDock.x,
         top: titleDock.y,
@@ -1158,7 +1132,7 @@ export function LiquidColumns() {
         transition: `opacity ${CROSS_FADE_MS}ms linear, color 200ms linear`,
         pointerEvents: crossVisible ? "auto" : "none",
       };
-  const crossTabIndex = isAbout
+  const crossTabIndex = isGrid
     ? settled
       ? undefined
       : -1
@@ -1255,14 +1229,15 @@ export function LiquidColumns() {
           has to be centred on the window for the two to be the same point. An earlier
           version carried the Experience photograph's `lg:right-40` here, and the
           portrait came out 60px left of centre because of it. */}
-      {/* About, "spec sheet" layout: one unified CSS grid (AboutGrid) owns
+      {/* About, "spec sheet" layout: one unified CSS grid (SpecSheetGrid) owns
           every margin, rule, and content cell — see
           docs/superpowers/specs/2026-08-07-about-lab-unified-grid-design.md. Mounted
           as a sibling of the title container below (not nested inside it): it is
           `position: absolute; inset: 0`, sized against `<main>`, and the title
           container's own box has no fixed height for it to size against instead. */}
       {opened !== null && COLUMNS[opened] === "About" && (
-        <AboutGrid
+        <SpecSheetGrid
+          columns={3}
           closing={closing}
           linesInAt={GRID_LINES_AT}
           linesOutAt={aboutLinesOutAt}
@@ -1273,10 +1248,10 @@ export function LiquidColumns() {
           imageVisible={imageVisible}
           imageFadeMs={IMAGE_FADE_MS}
           imageCellRefSm={(el) => {
-            portraitCellSm.current = el;
+            imageCellSm.current = el;
           }}
           imageCellRefXl={(el) => {
-            portraitCellXl.current = el;
+            imageCellXl.current = el;
           }}
           values={layoutValues}
           prose1={
@@ -1310,13 +1285,62 @@ export function LiquidColumns() {
         />
       )}
 
+      {/* Experience/Projects, the same "spec sheet" grid as About but in its
+          2-column mode: one prose column and an image cell that keeps the
+          width a third column would otherwise take at `xl`. The image cell
+          hosts the same drag/scroll photo strip as before (`strip(entries)`),
+          now filling the cell edge-to-edge (`object-cover`) instead of a fixed
+          3:4 frame — the cube's fill-in-place treatment only reads right
+          against a cell it actually fills. Mounted as a sibling of the title
+          container for the same reason About's grid is. */}
+      {entries && shown && (
+        <SpecSheetGrid
+          columns={2}
+          closing={closing}
+          linesInAt={GRID_LINES_AT}
+          linesOutAt={aboutLinesOutAt}
+          contentInAt={titleStartAt}
+          contentInDuration={aboutContentInDuration}
+          contentOutAt={aboutContentOutAt}
+          contentOutDuration={aboutContentOutDuration}
+          imageVisible={imageVisible}
+          imageFadeMs={IMAGE_FADE_MS}
+          imageCellRefSm={(el) => {
+            imageCellSm.current = el;
+          }}
+          values={layoutValues}
+          prose1={
+            // Three levels, one job each: leaving, arriving, and the scroll fade —
+            // see the equivalent comment this replaced for why they cannot share
+            // an element.
+            <div
+              className={closing ? "depart" : "arrive"}
+              style={{ animationDelay: closing ? "0ms" : `${restAt}ms` }}
+            >
+              <article
+                className="entry-fade"
+                style={{ "--ti": textIndex } as React.CSSProperties}
+              >
+                {leading(shown)}
+                <p className={`mt-8 sm:mt-10 ${PROSE}`}>{shown.summary}</p>
+                {shown.links && (
+                  <p className="mt-8 flex gap-6">
+                    {shown.links.map((link) => mark({ ...link, settled }))}
+                  </p>
+                )}
+              </article>
+            </div>
+          }
+          image={strip(entries)}
+          legend={null}
+        />
+      )}
+
       {/* The title container's left/right come from the layout values
           (marginLeft/marginRight) rather than static classes, applied at every width.
           Its own top is pinned right after the top margin line (marginTop + 1) rather
           than at titleTop directly — the title row just inside it (below) is what
-          titleTop positions, by centring within titleSpace. MEASURE_END and the photo
-          strip's own `right-20` below are not wired to these values — a known, accepted
-          gap rather than an oversight. */}
+          titleTop positions, by centring within titleSpace. */}
       <div
         aria-hidden={!settled}
         className="pointer-events-none absolute"
@@ -1378,74 +1402,20 @@ export function LiquidColumns() {
           </div>
         </div>
 
-        {/* Only the section that has entries gets them. Everything shares the
-            title's left edge by sitting inside it, so nothing can drift out of
-            alignment on its own. Each entry arrives a beat after the title, and
-            its own three parts a beat after each other. */}
-        {entries && shown && (
-          // Two nested mechanisms, on purpose. The outer element owns the section
-          // opening and closing; the inner one, re-keyed on the entry, owns the
-          // change from one experience to the next. They cannot share an element: a
-          // CSS animation with fill-mode `both` holds its last frame and would win
-          // over the inline opacity the exit needs.
-          // Three levels, one job each: leaving, arriving, and the scroll fade.
-          // They cannot share an element — an animation holding its last frame
-          // would win over the opacity the other two need.
-          <div className="mt-12 sm:mt-16" style={{ minHeight: BLOCK_H }}>
-            <div
-              className={closing ? "depart" : "arrive"}
-              style={{ animationDelay: closing ? "0ms" : `${restAt}ms` }}
-            >
-            {/* The scroll fade. `--ti` is the entry the wording is on; the stylesheet
-                works its distance from `--p` and fades on it, the same shape the
-                pictures use and all the way to nothing. Nothing here has a duration:
-                the speed of the fade is the speed of the hand. */}
-            <article
-              className="entry-fade"
-              style={{ "--ti": textIndex } as React.CSSProperties}
-            >
-              {leading(shown)}
-                {/* 48 characters, or whatever the window can spare — whichever is
-                    smaller. That measure reads as a column of text rather than a
-                    paragraph running the page width, and it is about where five
-                    lines land; but it is a fixed width, so on a narrower window it
-                    would keep growing into the image on the right. It has to give
-                    way instead, or a long line lands under the photo. */}
-              <p className={`mt-8 max-w-[min(48ch,44vw)] sm:mt-10 ${PROSE}`}>
-                {shown.summary}
-              </p>
-
-              {/* Where a project can be gone to. Inside the article, so it fades with
-                  the wording rather than on its own — which is also what hides the row
-                  moving up or down a line when one entry's summary is shorter than the
-                  next one's: the reflow happens at opacity 0.
-
-                  No arrow on them any more. The brackets already say the mark is a mark,
-                  and the letters spreading under the pointer says it is live — an arrow
-                  as well was one sign too many, and the only glyph on the page that was
-                  not a letter, a digit or a bracket. */}
-              {shown.links && (
-                <p className="mt-8 flex gap-6">
-                  {shown.links.map((link) => mark({ ...link, settled }))}
-                </p>
-              )}
-            </article>
-            </div>
-          </div>
-        )}
-
         {/* Contact: a line of prose and the three ways to reach her.
 
-            The same box as an Experience entry's — the same parent, the same
-            `mt-12 sm:mt-16`, the same reserved height — and the same empty name and dates
-            reserved above the prose that About reserves. That is what puts this section's
-            first line on the line the other three start on, so nothing shifts vertically
-            as you move between them. It is the only reason `leading(null)` is here: there
-            is no name and no date to show, only a height to hold.
+            The same reserved height as the grid sections' own prose1 used to share
+            (`BLOCK_H`, `mt-12 sm:mt-16`) — Contact never moved into the grid, so it
+            keeps the layout that figure was sized for — and the same empty name and
+            dates reserved above the prose that a grid section's leading(shown) has a
+            real one for. That is what puts this section's first line on the line the
+            other three start on, so nothing shifts vertically as you move between
+            them. It is the only reason `leading(null)` is here: there is no name and
+            no date to show, only a height to hold.
 
-            48 characters, the measure an Experience summary reads at. No `44vw` clamp on
-            it though — that exists to keep a long line out of the photograph on the right,
-            and this is the one section with nothing over there.
+            48 characters, the measure an Experience summary reads at — Contact never
+            had a photograph to keep a long line clear of, so it never needed the
+            `44vw` clamp Experience/Projects' own prose used to carry either.
 
             The row of marks is the projects' row: same `mt-8`, same `gap-6`, same type. */}
         {opened !== null && COLUMNS[opened] === "Contact" && (
@@ -1465,67 +1435,6 @@ export function LiquidColumns() {
           </div>
         )}
       </div>
-
-      {/* The entry's image, opposite its text: the left half reads, the right half
-          looks. Vertically centred rather than pinned to the title, which keeps it
-          from tipping the page top-heavy next to a short entry.
-
-          Hidden below `sm`: at that width the image and a 48-character measure
-          cannot share a line, and the page cannot scroll to stack them — it is one
-          viewport tall with the overflow clipped.
-
-          This element is not the picture, it is the half of the line the picture has:
-          from the end of the measure to the columns' own right gutter. The picture
-          centres itself in it with `mx-auto`, which is why nothing here says how far
-          from the right edge it should sit — that distance is whatever is left over,
-          and it comes out the same on both sides at every width. */}
-      {entries && (
-        <div
-          className="pointer-events-none absolute right-20 hidden -translate-y-1/2 sm:block"
-          // Its resting height, and the same figure handed to the CSS: the spacing
-          // between two photographs is worked out from it, since a strip that rests
-          // off-centre has further to travel to clear the top of the window.
-          style={
-            {
-              top: IMAGE_REST_Y,
-              left: MEASURE_END,
-              "--rest": `${IMAGE_REST_Y}px`,
-            } as React.CSSProperties
-          }
-        >
-          {/* The reveal owns `transform` for its rise, so the centring translate has to
-              live on the parent rather than fight it here.
-
-              The frame is 3:4 upright, which is what the photographs already are, so
-              object-cover has nothing to crop and each one is shown whole.
-
-              The first and last terms are the size, and they are one figure in two
-              forms: 26vw is what it takes on a window narrower than 1231px, 320px is
-              where it stops growing on one wider. Upright, the frame reads much larger
-              than the same width did lying down — its height is 4/3 of it rather than
-              1/1.85 — so these are well under the 34vw and 560px the landscape frame
-              had. Changing the size is changing these two together; keep the ratio
-              between them or the breakpoint below moves.
-
-              The middle term is not a size, it is the foot of the window. The frame is
-              centred on IMAGE_REST_Y, so half its height has to fit in what is left
-              below 455 — less a 24px margin, which is where 479 comes from, and times
-              3/2 to read back as a width. It only governs below about 690px of window
-              height; above that the frame is already smaller than it allows. */}
-          <div
-            className={`${
-              closing ? "depart" : "arrive"
-            } relative mx-auto aspect-[3/4] w-[min(26vw,calc((100dvh_-_479px)*3/2),320px)]`}
-            style={{ animationDelay: closing ? "0ms" : `${restAt}ms` }}
-          >
-            {/* Every entry is laid out from the same position, a screen apart.
-                Nothing is keyed or replayed: drag the position and the whole strip
-                moves with it. The frame does not clip them — only the page does —
-                so a picture is visible for the whole of its crossing. */}
-            {strip(entries)}
-          </div>
-        </div>
-      )}
 
       {/* The way back out, plus Escape. `dock.x`/`dock.y` rather than a fixed
           inset, so it follows the cube's own dock position (see
