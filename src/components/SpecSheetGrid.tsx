@@ -92,21 +92,22 @@ export function SpecSheetGrid({
   imageCellRefXl?: (el: HTMLDivElement | null) => void;
   values: AboutGridLayout;
   /** Only ever shown on a 3-column section. On a 2-column section, its one
-      prose column is `subtitle`/`body`/`links` instead — three rows rather
-      than one, so a short summary's slack lands between `body` and `links`
-      rather than pushing links up against it. */
+      prose column is `subtitle` (row 3, between the title's doubled rule)
+      plus `body`/`links` (row 5, the main content row) instead. */
   prose1?: ReactNode;
   image: ReactNode;
   /** Only ever shown on a 3-column section, at `xl`. */
   prose2?: ReactNode;
-  /** 2-column section only: the entry's name and dates, in the row directly
-      below the title's own doubled rule — `auto` height, sized to its own
-      content. */
+  /** 2-column section only: the entry's name and dates — row 3, the space
+      between the title's own doubled rule (`r5`/`r6`), which every section
+      already reserves but only About's placeholder subtitle used to leave
+      empty here. */
   subtitle?: ReactNode;
-  /** 2-column section only: the entry's summary, sharing a row with `links`
-      (which follows it in normal document flow, so it always sits directly
-      under it whatever the summary's own length) — together they take the
-      `1fr` row below `subtitle`. */
+  /** 2-column section only: the entry's summary, sharing row 5 (`r8`/`r9`)
+      with `links`, which follows it in normal document flow — so links sit
+      directly under the summary whatever its own length, and the row's
+      `1fr` still absorbs the slack so the legend stays pinned to the bottom
+      of the section rather than to a short entry's own content. */
   body?: ReactNode;
   /** 2-column section only: the entry's links, rendered directly after
       `body` in the same row — simply absent on an entry with none. */
@@ -117,20 +118,14 @@ export function SpecSheetGrid({
   const halfGap = values.columnGap / 2;
   const titleSpace = values.titleTop + TITLE_LINE_HEIGHT - values.marginTop - 1;
 
-  // A 3-column section's content is one row (r8/r9); a 2-column section
-  // splits that same span into two instead — `subtitle` (auto, right below
-  // the title) and everything else (1fr, so it still absorbs whatever height
-  // `subtitle` doesn't take and the legend stays pinned to the bottom of the
-  // section, not to the bottom of a short entry's own content). Either way
-  // the span from r7 to r10 (what the image cell reads) is unchanged: the
-  // rows filling it just add up differently.
-  const rows = threeCol
-    ? `[r0] ${values.marginTop}px [r1] 1px [r2] ${titleSpace}px [r3] ${values.titleToRule1}px ` +
-      `[r4] 1px [r5] ${values.rule1ToRule2}px [r6] 1px [r7] ${values.columnGap}px ` +
-      `[r8] 1fr [r9] 1px [r10] ${values.columnGap}px [r11] auto [r12] 1px [r13] ${values.marginBottom}px [r14]`
-    : `[r0] ${values.marginTop}px [r1] 1px [r2] ${titleSpace}px [r3] ${values.titleToRule1}px ` +
-      `[r4] 1px [r5] ${values.rule1ToRule2}px [r6] 1px [r7] ${values.columnGap}px ` +
-      `[r8] auto [r8b] 1fr [r9] 1px [r10] ${values.columnGap}px [r11] auto [r12] 1px [r13] ${values.marginBottom}px [r14]`;
+  // One shared row template for both column counts — a 2-column section
+  // doesn't need its own: `subtitle` uses the same r5/r6 gap every section
+  // already reserves between the title's doubled rule, and `body`+`links`
+  // together take the same r8/r9 content row prose1 does on a 3-column one.
+  const rows =
+    `[r0] ${values.marginTop}px [r1] 1px [r2] ${titleSpace}px [r3] ${values.titleToRule1}px ` +
+    `[r4] 1px [r5] ${values.rule1ToRule2}px [r6] 1px [r7] ${values.columnGap}px ` +
+    `[r8] 1fr [r9] 1px [r10] ${values.columnGap}px [r11] auto [r12] 1px [r13] ${values.marginBottom}px [r14]`;
 
   const colsBase = `[b0] ${values.marginLeft}px [b1] 1px [b2] 1fr [b3] 1px [b4] ${values.marginRight}px [b5]`;
 
@@ -242,7 +237,10 @@ export function SpecSheetGrid({
             </div>
           ) : (
             <>
-              <div style={{ gridColumn: "b2 / b3", gridRow: "r8 / r8b", width: "100%", padding: "0 8px" }}>
+              {/* Row 3 — the space between the title's own doubled rule,
+                  r5/r6 — every section already reserves this; a 2-column one
+                  is the first to put something in it. */}
+              <div style={{ gridColumn: "b2 / b3", gridRow: "r5 / r6", width: "100%", padding: "0 8px" }}>
                 {subtitle}
               </div>
               {/* body and links share this row rather than each getting their
@@ -250,7 +248,7 @@ export function SpecSheetGrid({
                   directly under it whatever the summary's own length turns
                   out to be, instead of at a fixed distance from the row above
                   that a short summary would otherwise leave a gap in front of. */}
-              <div style={{ gridColumn: "b2 / b3", gridRow: "r8b / r9", width: "100%", padding: "0 8px" }}>
+              <div style={{ gridColumn: "b2 / b3", gridRow: "r8 / r9", width: "100%", padding: "0 8px" }}>
                 {body}
                 {links}
               </div>
