@@ -1100,6 +1100,27 @@ export function LiquidColumns() {
    */
   const shown = entries?.[Math.min(textIndex, entries.length - 1)];
 
+  /** Wraps one row of an Experience/Projects entry block (subtitle, body, or
+      links) in the same two mechanisms every such row needs: the outer leaves
+      and arrives with the section (`arrive`/`depart`), the inner fades on the
+      scroll position between entries (`entry-fade`, off `textIndex`/`--ti`).
+      They cannot share an element with each other — a CSS animation with
+      fill-mode `both` holds its last frame and would win over the inline
+      opacity the exit needs — so each of the three rows gets its own copy. */
+  const entryBlock = (content: React.ReactNode) => (
+    <div
+      className={closing ? "depart" : "arrive"}
+      style={{ animationDelay: closing ? "0ms" : `${restAt}ms` }}
+    >
+      <article
+        className="entry-fade"
+        style={{ "--ti": textIndex } as React.CSSProperties}
+      >
+        {content}
+      </article>
+    </div>
+  );
+
   const isGrid = GRID_SECTIONS.has(label);
   /** A grid section's [ X ] runs on the exact same clock prose1/prose2/legend
       do (see SpecSheetGrid's own content-fade-in/out) — a `mark`, so it needs
@@ -1309,27 +1330,22 @@ export function LiquidColumns() {
             imageCellSm.current = el;
           }}
           values={layoutValues}
-          prose1={
-            // Three levels, one job each: leaving, arriving, and the scroll fade —
-            // see the equivalent comment this replaced for why they cannot share
-            // an element.
-            <div
-              className={closing ? "depart" : "arrive"}
-              style={{ animationDelay: closing ? "0ms" : `${restAt}ms` }}
-            >
-              <article
-                className="entry-fade"
-                style={{ "--ti": textIndex } as React.CSSProperties}
-              >
-                {leading(shown)}
-                <p className={`mt-8 sm:mt-10 ${PROSE}`}>{shown.summary}</p>
-                {shown.links && (
-                  <p className="mt-8 flex gap-6">
-                    {shown.links.map((link) => mark({ ...link, settled }))}
-                  </p>
-                )}
-              </article>
-            </div>
+          // subtitle/body/links are three separate grid rows now (see
+          // SpecSheetGrid's own prop comments), so each needs its own copy of
+          // the same two wrappers every entry block used to share: the outer
+          // one leaves/arrives with the section, the inner one fades on the
+          // scroll position — see the equivalent comment this replaced for why
+          // they cannot share an element with each other, and now cannot
+          // share one with their neighbouring row either.
+          subtitle={entryBlock(leading(shown))}
+          body={entryBlock(<p className={`mt-8 sm:mt-10 ${PROSE}`}>{shown.summary}</p>)}
+          links={
+            shown.links &&
+            entryBlock(
+              <p className="mt-8 flex gap-6">
+                {shown.links.map((link) => mark({ ...link, settled }))}
+              </p>,
+            )
           }
           image={strip(entries)}
           legend={null}

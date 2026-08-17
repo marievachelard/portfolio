@@ -41,6 +41,9 @@ export function SpecSheetGrid({
   prose1,
   image,
   prose2,
+  subtitle,
+  body,
+  links,
   legend,
 }: {
   /** 3 for About (prose, image, prose — the third column only at `xl`), 2 for
@@ -88,20 +91,46 @@ export function SpecSheetGrid({
   /** Unused (and never called) on a 2-column section — see `columns`. */
   imageCellRefXl?: (el: HTMLDivElement | null) => void;
   values: AboutGridLayout;
-  prose1: ReactNode;
+  /** Only ever shown on a 3-column section. On a 2-column section, its one
+      prose column is `subtitle`/`body`/`links` instead — three rows rather
+      than one, so a short summary's slack lands between `body` and `links`
+      rather than pushing links up against it. */
+  prose1?: ReactNode;
   image: ReactNode;
   /** Only ever shown on a 3-column section, at `xl`. */
   prose2?: ReactNode;
+  /** 2-column section only: the entry's name and dates, in the row directly
+      below the title's own doubled rule — `auto` height, sized to its own
+      content. */
+  subtitle?: ReactNode;
+  /** 2-column section only: the entry's summary, sharing a row with `links`
+      (which follows it in normal document flow, so it always sits directly
+      under it whatever the summary's own length) — together they take the
+      `1fr` row below `subtitle`. */
+  body?: ReactNode;
+  /** 2-column section only: the entry's links, rendered directly after
+      `body` in the same row — simply absent on an entry with none. */
+  links?: ReactNode;
   legend: ReactNode;
 }) {
   const threeCol = columns === 3;
   const halfGap = values.columnGap / 2;
   const titleSpace = values.titleTop + TITLE_LINE_HEIGHT - values.marginTop - 1;
 
-  const rows =
-    `[r0] ${values.marginTop}px [r1] 1px [r2] ${titleSpace}px [r3] ${values.titleToRule1}px ` +
-    `[r4] 1px [r5] ${values.rule1ToRule2}px [r6] 1px [r7] ${values.columnGap}px ` +
-    `[r8] 1fr [r9] 1px [r10] ${values.columnGap}px [r11] auto [r12] 1px [r13] ${values.marginBottom}px [r14]`;
+  // A 3-column section's content is one row (r8/r9); a 2-column section
+  // splits that same span into two instead — `subtitle` (auto, right below
+  // the title) and everything else (1fr, so it still absorbs whatever height
+  // `subtitle` doesn't take and the legend stays pinned to the bottom of the
+  // section, not to the bottom of a short entry's own content). Either way
+  // the span from r7 to r10 (what the image cell reads) is unchanged: the
+  // rows filling it just add up differently.
+  const rows = threeCol
+    ? `[r0] ${values.marginTop}px [r1] 1px [r2] ${titleSpace}px [r3] ${values.titleToRule1}px ` +
+      `[r4] 1px [r5] ${values.rule1ToRule2}px [r6] 1px [r7] ${values.columnGap}px ` +
+      `[r8] 1fr [r9] 1px [r10] ${values.columnGap}px [r11] auto [r12] 1px [r13] ${values.marginBottom}px [r14]`
+    : `[r0] ${values.marginTop}px [r1] 1px [r2] ${titleSpace}px [r3] ${values.titleToRule1}px ` +
+      `[r4] 1px [r5] ${values.rule1ToRule2}px [r6] 1px [r7] ${values.columnGap}px ` +
+      `[r8] auto [r8b] 1fr [r9] 1px [r10] ${values.columnGap}px [r11] auto [r12] 1px [r13] ${values.marginBottom}px [r14]`;
 
   const colsBase = `[b0] ${values.marginLeft}px [b1] 1px [b2] 1fr [b3] 1px [b4] ${values.marginRight}px [b5]`;
 
@@ -207,9 +236,26 @@ export function SpecSheetGrid({
               at — prose1 and the image share the same b2/b3 and b8/b9 pair in the
               sm and xl templates; prose2 only exists once xl's template supplies
               b14/b15, on a 3-column section. */}
-          <div style={{ gridColumn: "b2 / b3", gridRow: "r8 / r9", width: "100%", padding: "0 8px" }}>
-            {prose1}
-          </div>
+          {threeCol ? (
+            <div style={{ gridColumn: "b2 / b3", gridRow: "r8 / r9", width: "100%", padding: "0 8px" }}>
+              {prose1}
+            </div>
+          ) : (
+            <>
+              <div style={{ gridColumn: "b2 / b3", gridRow: "r8 / r8b", width: "100%", padding: "0 8px" }}>
+                {subtitle}
+              </div>
+              {/* body and links share this row rather than each getting their
+                  own: links follows body in normal document flow, so it sits
+                  directly under it whatever the summary's own length turns
+                  out to be, instead of at a fixed distance from the row above
+                  that a short summary would otherwise leave a gap in front of. */}
+              <div style={{ gridColumn: "b2 / b3", gridRow: "r8b / r9", width: "100%", padding: "0 8px" }}>
+                {body}
+                {links}
+              </div>
+            </>
+          )}
           {/* The image spans into the padding tracks on every side it has one, touching
               the surrounding rules directly instead of stopping at the narrower content
               track — "fills the cell" means the area between the rules, not just the
