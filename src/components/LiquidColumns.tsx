@@ -1338,7 +1338,7 @@ export function LiquidColumns() {
           // they cannot share an element with each other, and now cannot
           // share one with their neighbouring row either.
           subtitle={entryBlock(leading(shown))}
-          body={entryBlock(<p className={`mt-8 sm:mt-10 ${PROSE}`}>{shown.summary}</p>)}
+          body={entryBlock(<p className={PROSE}>{shown.summary}</p>)}
           links={
             shown.links &&
             entryBlock(
