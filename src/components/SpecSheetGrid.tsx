@@ -243,7 +243,20 @@ export function SpecSheetGrid({
               <div style={{ gridColumn: "b2 / b3", gridRow: "r5 / r6", width: "100%", padding: "0 8px" }}>
                 {subtitle}
               </div>
-              <div style={{ gridColumn: "b2 / b3", gridRow: "r8 / r9", width: "100%", padding: "0 8px" }}>
+              {/* Centred in row 5's own height (it's `1fr`, so usually taller
+                  than the summary itself) rather than sitting at the row's
+                  top edge, the way block content otherwise would. */}
+              <div
+                style={{
+                  gridColumn: "b2 / b3",
+                  gridRow: "r8 / r9",
+                  width: "100%",
+                  padding: "0 8px",
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "center",
+                }}
+              >
                 {body}
               </div>
               {/* Row 6 — the legend row (r11/r12), in column B rather than
