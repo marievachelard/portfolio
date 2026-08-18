@@ -239,8 +239,21 @@ export function SpecSheetGrid({
             <>
               {/* Row 3 — the space between the title's own doubled rule,
                   r5/r6 — every section already reserves this; a 2-column one
-                  is the first to put something in it. */}
-              <div style={{ gridColumn: "b2 / b3", gridRow: "r5 / r6", width: "100%", padding: "0 8px" }}>
+                  is the first to put something in it. Centred in the row's
+                  own height, same mechanism as `body`/`links` below: the
+                  name-and-dates line reads as sitting in the gap rather than
+                  pinned to its top edge. */}
+              <div
+                style={{
+                  gridColumn: "b2 / b3",
+                  gridRow: "r5 / r6",
+                  width: "100%",
+                  padding: "0 8px",
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "center",
+                }}
+              >
                 {subtitle}
               </div>
               {/* Centred in row 5's own height (it's `1fr`, so usually taller

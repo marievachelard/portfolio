@@ -360,11 +360,13 @@ const IMAGE_SIZES = "45vw";
 // the `1fr` content row) rather than a calc() derived from these constants.
 
 /**
- * The two lines above a summary: an entry's name, and its dates.
+ * The line above a summary: an entry's name and its dates, sharing one line rather than
+ * stacking on two — the dates trail the title as a bracketed mark, `items-baseline` so
+ * the smaller mono type sits on the title's own baseline rather than floating above it.
  *
- * About has neither and passes null, which renders them empty and hidden. That is the
+ * About has neither and passes null, which renders it empty and hidden. That is the
  * whole mechanism behind the two sections lining up, and it is deliberately not a
- * measured offset: the space above the prose is held by the same elements carrying the
+ * measured offset: the space above the prose is held by the same element carrying the
  * same type, so the first line of an About block lands exactly where an Experience
  * summary lands — at every width, without either section knowing the other's figures,
  * and still true if the heading or the dates are ever restyled.
@@ -381,22 +383,16 @@ const IMAGE_SIZES = "45vw";
 const NBSP = " ";
 
 const leading = (item: { title: string; dates: string } | null) => (
-  <>
-    <h2
-      className={`text-lg font-medium tracking-tight text-neutral-900 sm:text-2xl${
-        item ? "" : " invisible"
-      }`}
-    >
-      {item ? item.title : NBSP}
-    </h2>
-    <p
-      className={`mt-2 font-mono text-[10px] tracking-[0.2em] tabular-nums text-neutral-400 sm:text-xs${
-        item ? "" : " invisible"
-      }`}
-    >
-      {item ? item.dates : NBSP}
-    </p>
-  </>
+  <h2
+    className={`flex items-baseline gap-2 whitespace-nowrap text-lg font-medium tracking-tight text-neutral-900 sm:text-2xl${
+      item ? "" : " invisible"
+    }`}
+  >
+    <span>{item ? item.title : NBSP}</span>
+    <span className="font-mono text-[10px] tracking-[0.2em] tabular-nums text-neutral-400 sm:text-xs">
+      {item ? `[ ${item.dates} ]` : NBSP}
+    </span>
+  </h2>
 );
 
 /** The prose itself, one measure and one set of type wherever it appears. */
