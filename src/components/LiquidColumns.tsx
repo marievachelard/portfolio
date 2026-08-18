@@ -522,8 +522,7 @@ export function LiquidColumns() {
 
   // Whichever of the two image cell refs is actually laid out right now — the
   // other's box is zeroed by its own `hidden` class rather than unmounted, so
-  // "has a width" is what tells them apart, not which one is set. A
-  // 2-column section only ever lays out the "sm" one.
+  // "has a width" is what tells them apart, not which one is set.
   const getImageCellRect = () => {
     const xl = imageCellXl.current;
     if (xl && xl.getBoundingClientRect().width > 0) return xl.getBoundingClientRect();
@@ -1324,6 +1323,9 @@ export function LiquidColumns() {
           imageFadeMs={IMAGE_FADE_MS}
           imageCellRefSm={(el) => {
             imageCellSm.current = el;
+          }}
+          imageCellRefXl={(el) => {
+            imageCellXl.current = el;
           }}
           values={layoutValues}
           // subtitle/body/links are three separate grid rows now (see

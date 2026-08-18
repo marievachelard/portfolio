@@ -15,9 +15,15 @@ import type { AboutGridLayout } from "@/lib/aboutGridLayout";
  *
  * `columns` picks the column template: 3 is About's own — two prose columns either
  * side of the image, switching in a second prose column at `xl` — and 2 is Experience
- * and Projects', a single prose column and an image that keeps the extra width `xl`
- * would otherwise have handed to a second column instead. A 2-column section never
- * renders `prose2`, an `imageCellRefXl`, or the xl-only rules a third column needs.
+ * and Projects', a single prose column and an image that absorbs the width a second
+ * prose column would have taken instead. Both switch to the very same `xl` column
+ * template at 1280px, so a 2-column section's prose column sizes against the same
+ * three-way fr split About's does — otherwise its share of the flexible space would be
+ * a wider 1-of-2 rather than About's 1-of-3, and the rule after it would drift right of
+ * About's own at wide viewports. A 2-column section never renders `prose2`, but does
+ * render its own `imageCellRefXl` and the xl-only right margin rule, at the same line
+ * names About's occupy — its image cell just spans further, over where prose2 would
+ * have sat, instead of stopping short of it.
  *
  * Breakpoints are Tailwind's own `sm` (640px) and `xl` (1280px), matching every other
  * responsive value already on this page.
@@ -47,8 +53,9 @@ export function SpecSheetGrid({
   legend,
 }: {
   /** 3 for About (prose, image, prose — the third column only at `xl`), 2 for
-      Experience/Projects (prose, image — image keeps the width `xl` would
-      otherwise hand to a second prose column). */
+      Experience/Projects (prose, image — the image absorbs the width `xl`
+      would otherwise hand to a second prose column, rather than the prose
+      column growing to fill it). */
   columns: 2 | 3;
   closing: boolean;
   /** When the grid's own lines start sliding into place, ms after the section
@@ -83,12 +90,12 @@ export function SpecSheetGrid({
   imageVisible: boolean;
   /** How long that fade-out takes. */
   imageFadeMs: number;
-  /** Attached to the image's own cell (one per breakpoint variant for a
-      3-column section, only one ever laid out at a time — a 2-column section
-      has only the one, laid out from `sm` up) so LiquidColumns can measure
-      it — that cell's centre and size are the cube's dock and fill target. */
+  /** Attached to the image's own cell — one per breakpoint variant, only one
+      ever laid out at a time — so LiquidColumns can measure it: that cell's
+      centre and size are the cube's dock and fill target. */
   imageCellRefSm: (el: HTMLDivElement | null) => void;
-  /** Unused (and never called) on a 2-column section — see `columns`. */
+  /** Called by every section, not just a 3-column one — see `columns` for why
+      a 2-column section's image cell needs an `xl` variant too. */
   imageCellRefXl?: (el: HTMLDivElement | null) => void;
   values: AboutGridLayout;
   /** Only ever shown on a 3-column section. On a 2-column section, its one
@@ -145,7 +152,7 @@ export function SpecSheetGrid({
       <style>{`
         .spec-sheet-grid { grid-template-columns: ${colsBase}; }
         @media (min-width: 640px) { .spec-sheet-grid { grid-template-columns: ${colsSm}; } }
-        ${threeCol ? `@media (min-width: 1280px) { .spec-sheet-grid { grid-template-columns: ${colsXl}; } }` : ""}
+        @media (min-width: 1280px) { .spec-sheet-grid { grid-template-columns: ${colsXl}; } }
       `}</style>
 
       {/* The lines alone — see grid-lines-in/out in globals.css for the shutters'
@@ -176,18 +183,14 @@ export function SpecSheetGrid({
           <div style={{ ...RULE, gridColumn: "b1 / b2", gridRow: "1 / -1" }} />
 
           {/* The right margin line's own position is the one thing that genuinely
-              differs by breakpoint (the base and sm templates end sooner than xl's),
-              so it needs one variant per template, each hidden outside its own range.
-              A 2-column section never switches to the xl template, so its sm-range
-              variant simply stays visible past 1280px instead of handing off. */}
+              differs by breakpoint (the base template ends sooner than sm/xl's), so
+              it needs one variant per template, each hidden outside its own range.
+              Both column counts hand off from sm's line to xl's the same way now —
+              a 2-column section switches to the very same xl template About does
+              (see `columns`), so b9/b10 stops being its margin line at 1280px too. */}
           <div className="sm:hidden" style={{ ...RULE, gridColumn: "b3 / b4", gridRow: "1 / -1" }} />
-          <div
-            className={threeCol ? "hidden sm:block xl:hidden" : "hidden sm:block"}
-            style={{ ...RULE, gridColumn: "b9 / b10", gridRow: "1 / -1" }}
-          />
-          {threeCol && (
-            <div className="hidden xl:block" style={{ ...RULE, gridColumn: "b15 / b16", gridRow: "1 / -1" }} />
-          )}
+          <div className="hidden sm:block xl:hidden" style={{ ...RULE, gridColumn: "b9 / b10", gridRow: "1 / -1" }} />
+          <div className="hidden xl:block" style={{ ...RULE, gridColumn: "b15 / b16", gridRow: "1 / -1" }} />
 
           {/* Doubled pair flanking the image's left edge — visible from `sm`, where
               b4/b5 and b6/b7 both exist and mean the same thing in the sm and xl
@@ -196,7 +199,9 @@ export function SpecSheetGrid({
           <div className="hidden sm:block" style={{ ...RULE, gridColumn: "b6 / b7", gridRow: "1 / -1" }} />
 
           {/* Doubled pair flanking the image's right edge — only exists once a third
-              column appears, at `xl` on a 3-column section. */}
+              column appears, at `xl` on a 3-column section. A 2-column section's image
+              spans straight over this same space instead (see the image cell below),
+              so it never wants this pair. */}
           {threeCol && (
             <>
               <div className="hidden xl:block" style={{ ...RULE, gridColumn: "b10 / b11", gridRow: "1 / -1" }} />
@@ -298,12 +303,13 @@ export function SpecSheetGrid({
           {/* The image spans into the padding tracks on every side it has one, touching
               the surrounding rules directly instead of stopping at the narrower content
               track — "fills the cell" means the area between the rules, not just the
-              1fr track inside it. Two variants on a 3-column section: two-column mode's
-              image already touches the outer right margin line directly (no padding
-              track past it, by design — see the doubled-pair comment above), so only
-              its left side gains the extra span; three-column mode gains it on both
-              sides. A 2-column section only ever renders the one variant, kept laid
-              out (rather than swapped for an xl-only sibling) past 1280px too.
+              1fr track inside it. Both column counts render two variants, sm and xl,
+              since the image's own reach changes at 1280px regardless of `columns`: a
+              3-column section's image gains span on both sides once prose2 appears
+              alongside it (still stopping short of prose2's own cell); a 2-column
+              section's has no prose2 to stop short of, so its xl variant spans all the
+              way to the outer right margin line instead, over the same space prose2
+              would have sat in (see `columns`) — b7/b15 rather than b7/b10.
 
               Its own opacity/transition (imageVisible/imageFadeMs), separate from the
               content-fade-in/out this cell's siblings run on — see imageVisible's own
@@ -317,11 +323,7 @@ export function SpecSheetGrid({
               past the cell's own edges, over the rules meant to frame it. */}
           <div
             ref={imageCellRefSm}
-            className={
-              threeCol
-                ? "relative hidden overflow-hidden sm:block xl:hidden"
-                : "relative hidden overflow-hidden sm:block"
-            }
+            className="relative hidden overflow-hidden sm:block xl:hidden"
             style={{
               gridColumn: "b7 / b9",
               gridRow: "r7 / r10",
@@ -331,20 +333,18 @@ export function SpecSheetGrid({
           >
             {image}
           </div>
-          {threeCol && (
-            <div
-              ref={imageCellRefXl}
-              className="relative hidden overflow-hidden xl:block"
-              style={{
-                gridColumn: "b7 / b10",
-                gridRow: "r7 / r10",
-                opacity: imageVisible ? 1 : 0,
-                transition: `opacity ${imageFadeMs}ms linear`,
-              }}
-            >
-              {image}
-            </div>
-          )}
+          <div
+            ref={imageCellRefXl}
+            className="relative hidden overflow-hidden xl:block"
+            style={{
+              gridColumn: threeCol ? "b7 / b10" : "b7 / b15",
+              gridRow: "r7 / r10",
+              opacity: imageVisible ? 1 : 0,
+              transition: `opacity ${imageFadeMs}ms linear`,
+            }}
+          >
+            {image}
+          </div>
           {/* b13 / b15, not b14 / b15: prose1 sits directly against its own nearest
               visible line (lineL, no padding track between them), so its 8px padding
               reads as "8px from the line." Prose2's nearest visible line (lineB2) has
