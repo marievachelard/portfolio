@@ -320,21 +320,14 @@ a {
   display: inline-grid;
 }
 
-/* Anchored to the box's left edge, not centred in it, so the first character always
-   sits on the page's own left margin — the letters that close up on hover pull inward
-   from there rather than the whole mark drifting to stay centred in room it no longer
-   fills. */
+/* Centred in the box, not anchored to its left edge — the reserved room is split
+   either side, so the letters that close up on hover pull in from both ends at once
+   and the mark retracts toward its own middle, the same way About's coordinates
+   always have. Every mark reads the same now, there being only the one way to close. */
 .mark > * {
   grid-area: 1 / 1;
-  justify-self: start;
-  white-space: nowrap;
-}
-
-/* Except where being on the middle of the page is the whole point of the mark, and there
-   is no left edge for it to answer to. Then the reserved room is split either side and the
-   letters spread symmetrically. */
-.mark-mid > * {
   justify-self: center;
+  white-space: nowrap;
 }
 
 .mark-sizer {

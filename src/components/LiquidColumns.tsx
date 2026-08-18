@@ -423,13 +423,10 @@ const mark = ({
   href,
   label,
   settled,
-  centred,
 }: {
   href: string;
   label: string;
   settled: boolean;
-  /** Placed on the middle of the page rather than flush to its left margin. */
-  centred?: boolean;
 }) => {
   const opensAPage = !href.startsWith("mailto:");
   return (
@@ -439,9 +436,7 @@ const mark = ({
     target={opensAPage ? "_blank" : undefined}
     rel={opensAPage ? "noreferrer" : undefined}
     tabIndex={settled ? undefined : -1}
-    className={`mark${
-      centred ? " mark-mid" : ""
-    } pointer-events-auto font-mono text-[10px] tracking-[0.2em] text-neutral-400 transition-colors duration-200 hover:text-neutral-900 sm:text-xs`}
+    className="mark pointer-events-auto font-mono text-[10px] tracking-[0.2em] text-neutral-400 transition-colors duration-200 hover:text-neutral-900 sm:text-xs"
   >
     <span aria-hidden className="mark-sizer">
       [ {label} ]
@@ -1297,7 +1292,6 @@ export function LiquidColumns() {
             href: "https://www.toulouse-tourisme.com/",
             label: "N 43.60079° / E 1.35044°",
             settled,
-            centred: true,
           })}
         />
       )}
