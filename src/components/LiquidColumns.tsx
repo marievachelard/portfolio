@@ -1093,14 +1093,17 @@ export function LiquidColumns() {
 
   /** Wraps one row of an Experience/Projects entry block (subtitle, body, or
       links) in the same two mechanisms every such row needs: the outer leaves
-      and arrives with the section (`arrive`/`depart`), the inner fades on the
-      scroll position between entries (`entry-fade`, off `textIndex`/`--ti`).
-      They cannot share an element with each other — a CSS animation with
-      fill-mode `both` holds its last frame and would win over the inline
-      opacity the exit needs — so each of the three rows gets its own copy. */
+      and arrives with the section (`content-fade-in`/`content-fade-out` — the
+      same pure-opacity treatment About's own prose uses, just on its own delay
+      so it waits for the title to finish typing rather than running on
+      SpecSheetGrid's clock), the inner fades on the scroll position between
+      entries (`entry-fade`, off `textIndex`/`--ti`). They cannot share an
+      element with each other — a CSS animation with fill-mode `both` holds
+      its last frame and would win over the inline opacity the exit needs —
+      so each of the three rows gets its own copy. */
   const entryBlock = (content: React.ReactNode) => (
     <div
-      className={closing ? "depart" : "arrive"}
+      className={closing ? "content-fade-out" : "content-fade-in"}
       style={{ animationDelay: closing ? "0ms" : `${restAt}ms` }}
     >
       <article

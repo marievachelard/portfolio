@@ -267,11 +267,11 @@ a {
     grid-lines-fade-out 650ms linear both;
 }
 
-/* The About grid's content — portrait, prose, legend — fades into the lines the
-   cube already drew, rather than rising into them the way arrive/depart's
-   translateY still does for every other block on the page (the entries under
-   Experience, Projects and Contact). Pure opacity: this content has no direction
-   of travel to answer to the way the grid lines or the shutters do. Same curves
+/* The grid's content — About's portrait/prose/legend, and Experience/Projects'
+   entry rows — fades into the lines the cube already drew, rather than rising
+   into them the way arrive/depart's translateY still does for Contact, the one
+   block left outside the grid. Pure opacity: this content has no direction of
+   travel to answer to the way the grid lines or the shutters do. Same curves
    and durations as arrive/depart, minus the transform. */
 @keyframes content-fade-in {
   from {
