@@ -45,6 +45,56 @@ uniform float uHover;    // 0..1 pointer resting on the docked cube
 
 out vec4 fragColor;
 
+/* ---------------------------- the photograph ---------------------------- */
+// Experience and Projects fill their image cell with this body, and the photograph is
+// not a layer on it: it is the colour the liquid is made of. The body lights it with the
+// same film, relief and glints it lights its own grey with, and reads it from inside, on
+// the body's back wall, so the surface bends it like anything seen through it. Everything
+// here is off unless uPhotoOn is set, and then the body is drawn exactly as before.
+uniform float uPhotoOn;     // 1 while the cell is being drawn with a photograph
+uniform float uPhotoVis;    // 0..1, how far the photograph has arrived over the plain liquid
+uniform sampler2D uPhA;     // the entry being left
+uniform sampler2D uPhB;     // the entry being arrived at
+uniform float uPhAspect;    // width / height of the photographs
+uniform vec2  uCellOrigin;  // the cell's bottom-left, device px
+uniform vec2  uCellSize;    // the cell, device px
+uniform float uT;           // 0..1, how far the strip is between the two entries
+uniform float uPeak;        // 0 on an entry, 1 half way between
+uniform float uSkin;        // how much of the skin is there: 0 flat, 1 as it always was
+
+// How far the photograph is drawn out at the peak, how much of its colour gives way to
+// the liquid's own pearl, and how far the surface carries it sideways.
+const float PH_BLUR  = 3.5;
+const float PH_WHITE = 0.80;
+const float PH_BEND  = 2.4;
+
+vec2 phCover(vec2 c){
+  float asp = uCellSize.x / uCellSize.y;
+  float r = asp / uPhAspect;
+  return r > 1.0 ? vec2(c.x, (c.y - 0.5) / r + 0.5) : vec2((c.x - 0.5) * r + 0.5, c.y);
+}
+// An offset in cell heights, as an offset into the photograph.
+vec2 phDisp(vec2 o){
+  float asp = uCellSize.x / uCellSize.y;
+  float r = asp / uPhAspect;
+  vec2 s = vec2(o.x / asp, o.y);
+  return r > 1.0 ? vec2(s.x, s.y / r) : vec2(s.x * r, s.y);
+}
+vec3 phLook(sampler2D tex, vec2 b, vec2 off, float lod, float spread){
+  vec3 acc = vec3(0.0);
+  for (int i = 0; i < 5; i++){
+    float a = float(i) * 1.2566;
+    vec2 s = (i == 0 ? vec2(0.0) : vec2(cos(a), sin(a))) * spread;
+    acc += textureLod(tex, b + off + s, lod).rgb;
+  }
+  return acc / 5.0;
+}
+vec3 phPair(vec2 c, vec2 off, float lod, float spread, float m){
+  vec2 b = phCover(c);
+  vec2 d = phDisp(off);
+  return mix(phLook(uPhA, b, d, lod, spread), phLook(uPhB, b, d, lod, spread), m);
+}
+
 const float PI2 = 6.28318530718;
 
 /* ---------- simplex noise (Ashima / Gustavson, standard port) ---------- */
@@ -159,7 +209,7 @@ float shape(vec3 p){
   // a mass flowing under gravity rather than as a textured solid. The noise
   // frequency rises as the body contracts, keeping the ripples the same apparent
   // size on screen instead of stretching into slabs on the smaller cube.
-  float amp = SKIN * fluid;
+  float amp = SKIN * fluid * uSkin;
   float freq = mix(1.05, 1.70, form);
 
   // Hold the corners. Damp the ripples wherever two box faces meet — measured by
@@ -179,7 +229,7 @@ float shape(vec3 p){
   // The body reaches toward the cursor.
   vec3 aim = normalize(vec3(uAim, -0.85));
   d -= pow(max(dot(normalize(q + 1e-5), aim), 0.0), 3.0)
-       * (0.10 + uSlosh * 0.07) * fluid;
+       * (0.10 + uSlosh * 0.07) * fluid * uSkin;
 
   return d;
 }
@@ -276,7 +326,17 @@ void main(){
   vec3 hmix = mix(uHalf, vec3(uCubeHalf), smoothstep(0.0, 0.70, uCube));
   vec3 bound = max(hmix, vec3(uCubeHalf * 1.55)) + SKIN * 1.6;
   float tNear, tFar;
-  if (!boxSpan(ro, rd, bound, tNear, tFar)) discard;
+  if (!boxSpan(ro, rd, bound, tNear, tFar)) {
+    if (uPhotoOn > 0.5) {
+      // A pinhole in the body: the photograph, drawn out like the rest and taken toward the
+      // liquid's pale, so it is not a dark thread in it.
+      vec3 hole = phPair((gl_FragCoord.xy - uCellOrigin) / uCellSize, vec2(0.0), PH_BLUR * uPeak, 0.010 * uPeak, smoothstep(0.42, 0.58, uT));
+      hole = mix(hole, vec3(0.86, 0.88, 0.94), smoothstep(0.0, 0.5, uPeak));
+      fragColor = vec4(hole, uPhotoVis * gate);
+      return;
+    }
+    discard;
+  }
 
   // The body now covers the whole column, so this loop runs for every pixel of
   // it. The slab entry above puts the ray just in front of the surface for most
@@ -289,7 +349,13 @@ void main(){
     t += d * STEP;
     if (t > tFar) break;
   }
-  if (!hit) discard;
+  if (!hit) {
+    if (uPhotoOn > 0.5) {
+      fragColor = vec4(phPair((gl_FragCoord.xy - uCellOrigin) / uCellSize, vec2(0.0), PH_BLUR * uPeak, 0.010 * uPeak, smoothstep(0.42, 0.58, uT)), uPhotoVis * gate);
+      return;
+    }
+    discard;
+  }
 
   vec3 pos = ro + rd * t;
   vec3 n = normalAt(pos, 0.0035);
@@ -342,6 +408,52 @@ void main(){
   alpha += spec * 0.55;
   alpha *= mix(1.0, 1.12, uCube);            // the cube sits a touch more solid
 
-  fragColor = vec4(clamp(col, 0.0, 1.0), clamp(alpha, 0.0, 1.0) * uFade * gate);
+  vec3 outCol = clamp(col, 0.0, 1.0);
+  float outAlpha = clamp(alpha, 0.0, 1.0);
+
+  if (uPhotoOn > 0.5) {
+    vec2 cc = (gl_FragCoord.xy - uCellOrigin) / uCellSize;
+    float pk = uPeak;
+    // The photograph lives inside the body, on its back wall: it is read where the
+    // refracted ray comes out, so the surface bends it the way it bends anything seen
+    // through it.
+    vec3 pexit = pos + rdIn * t2;
+    // Zero on an entry: the camera's slight convergence would otherwise shift every ray
+    // a little even through a flat surface, and a photograph at rest has to be itself.
+    vec2 shift = (pexit.xy - pos.xy) * (uUnit / uCellSize.y) * PH_BEND * smoothstep(0.0, 0.3, pk);
+    // Which photograph is here follows the liquid, not a fade: the surface's own noise
+    // decides where one has given way to the other.
+    float field = snoise(vec3(pos.xy * 1.1, uFlow * 0.30)) * 0.32 * sqrt(pk);
+    float mB = smoothstep(0.30, 0.70, uT + field);
+    vec3 ph = phPair(cc, shift, PH_BLUR * pk, 0.010 * pk, mB);
+    // Its colour is the liquid's. Its lights and darks are drawn toward the liquid's own
+    // lightness first, because a dark photograph lit like glass reads as dark glass and
+    // the liquid is pale; then what is left of its colour gives way to the grey the body
+    // is otherwise made of, so at the peak it is that liquid with a stain of the photograph.
+    float into = smoothstep(0.0, 0.35, pk);
+    float lumPh = max(dot(ph, vec3(0.299, 0.587, 0.114)), 0.05);
+    vec3 evened = min(ph * (0.7804 / lumPh), vec3(1.2));
+    vec3 albedo = mix(ph, evened, 0.7 * into);
+    albedo = mix(albedo, vec3(0.7804), PH_WHITE * into);
+    // The film tints it the way it tints the grey the body is otherwise made of: as a
+    // ratio to that grey.
+    vec3 tint = irid / 0.7804;
+    vec3 lit = albedo * tint;
+    lit *= mix(0.84, 1.06, diff) / 0.95;     // relief modelling
+    lit *= 0.90 + 0.20 * ndv;                // slight core darkening
+    lit = mix(lit, vec3(1.0), fres * 0.32);  // glancing angles go white
+    lit += spec;
+    // And it is seen the way the liquid is seen on the page: translucent, over the
+    // white. On an entry it is opaque, which is just the photograph; as the liquid takes
+    // hold it goes to its real alpha.
+    float liqAlpha = clamp(alpha, 0.0, 1.0);
+    float veil = mix(1.0, liqAlpha, smoothstep(0.0, 0.25, pk));
+    vec3 seen = mix(vec3(1.0), clamp(lit, 0.0, 1.0), veil);
+    vec3 photoCol = mix(ph, seen, smoothstep(0.0, 0.25, pk));
+    outCol = mix(outCol, photoCol, uPhotoVis);
+    outAlpha = mix(outAlpha, 1.0, uPhotoVis);
+  }
+
+  fragColor = vec4(outCol, outAlpha * uFade * gate);
 }
 `;

@@ -58,10 +58,26 @@ export type BlobTarget = {
    */
   dockFillWidth: number | null;
   dockFillHeight: number | null;
+  /**
+   * Experience and Projects: whether the photograph should be in the cell the body is
+   * filling. It arrives and leaves over PHOTO_FADE, so the page only states it.
+   */
+  photoVisible: boolean;
+  /**
+   * Where the strip is, in entries: 1.4 is forty percent of the way from the second
+   * photograph to the third. The page writes it as often as it changes and the body
+   * does everything else with it — see the shader's own comment on the photograph.
+   */
+  photoPos: number;
 };
 
 export type BlobRenderer = {
   target: BlobTarget;
+  /**
+   * The photographs of the section that is open, in the order of its entries — loaded,
+   * and at least two. Replaces the last set; null clears it.
+   */
+  setPhotos: (images: HTMLImageElement[] | null) => void;
   /** restart the loop after it idled itself out */
   wake: () => void;
   destroy: () => void;
@@ -97,6 +113,16 @@ const OVERFLOW_Y = 1.14;
  * rules under its own steam, never relying on the clip.
  */
 const CUBE_HALF = 0.58;
+
+/**
+ * Filling a cell that carries a photograph the body is drawn wider and taller than
+ * it is on the grid: it has to run past all four edges, or the wobble of its skin
+ * leaves small gaps at the rim where the photograph shows through unlit.
+ */
+const HALF_X_PHOTO = 1.6;
+const OVERFLOW_Y_PHOTO = 1.7;
+/** Seconds the photograph takes to arrive over the liquid, and to leave it. */
+const PHOTO_FADE = 0.32;
 
 /** How fast the flow phase advances at rest, and how much the pointer adds. */
 const FLOW_BASE = 0.41;
@@ -191,7 +217,19 @@ export function createBlobRenderer(canvas: HTMLCanvasElement): BlobRenderer | nu
     slosh: gl.getUniformLocation(program, "uSlosh"),
     aim: gl.getUniformLocation(program, "uAim"),
     hover: gl.getUniformLocation(program, "uHover"),
+    photoOn: gl.getUniformLocation(program, "uPhotoOn"),
+    photoVis: gl.getUniformLocation(program, "uPhotoVis"),
+    phA: gl.getUniformLocation(program, "uPhA"),
+    phB: gl.getUniformLocation(program, "uPhB"),
+    phAspect: gl.getUniformLocation(program, "uPhAspect"),
+    cellOrigin: gl.getUniformLocation(program, "uCellOrigin"),
+    cellSize: gl.getUniformLocation(program, "uCellSize"),
+    t: gl.getUniformLocation(program, "uT"),
+    peak: gl.getUniformLocation(program, "uPeak"),
+    skin: gl.getUniformLocation(program, "uSkin"),
   };
+  gl.uniform1i(u.phA, 0);
+  gl.uniform1i(u.phB, 1);
 
   gl.enable(gl.BLEND);
   gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
@@ -212,7 +250,37 @@ export function createBlobRenderer(canvas: HTMLCanvasElement): BlobRenderer | nu
     dockY: null,
     dockFillWidth: null,
     dockFillHeight: null,
+    photoVisible: false,
+    photoPos: 0,
   };
+
+  // The photographs of the open section, as textures, and how far the one in the cell
+  // has arrived. Linear, like the hand-off, so both ends of it actually finish.
+  let photoTex: WebGLTexture[] = [];
+  let photoAspect = 0.75;
+  let photoVis = 0;
+  /** How far the body is currently drawn as a photographed cell, for its own size. */
+  let photoDraw = 0;
+
+  function setPhotos(images: HTMLImageElement[] | null) {
+    for (const t of photoTex) gl.deleteTexture(t);
+    photoTex = [];
+    if (!images || images.length < 2) return;
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+    photoTex = images.map((img) => {
+      const t = gl.createTexture()!;
+      gl.bindTexture(gl.TEXTURE_2D, t);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+      gl.generateMipmap(gl.TEXTURE_2D);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      return t;
+    });
+    // All of a section's photographs are the same frame, so the first sets it.
+    photoAspect = images[0].naturalWidth / images[0].naturalHeight;
+  }
 
   // Eased state. `x`/`y` are CSS px. There is one body and it changes column in a
   // single frame — it never travels.
@@ -426,6 +494,11 @@ export function createBlobRenderer(canvas: HTMLCanvasElement): BlobRenderer | nu
     // way, which is what makes leaving read as unwinding rather than as a release.
     eased.hover = ease(eased.hover, target.cubeHover ? 1 : 0, 0.002, dt);
 
+    photoVis = Math.min(
+      1,
+      Math.max(0, photoVis + (target.photoVisible ? 1 : -1) * (dt / PHOTO_FADE)),
+    );
+
     // Linear, so both halves of the hand-off actually finish — an easing asymptote
     // would leave a permanent sliver of the old column on screen.
     const step = dt / HANDOFF;
@@ -465,6 +538,9 @@ export function createBlobRenderer(canvas: HTMLCanvasElement): BlobRenderer | nu
     gl.uniform1f(u.hover, eased.hover);
     // No two bodies share a column, so the clip windows never overlap and straight
     // alpha blending is enough to draw them one after the other.
+    gl.uniform1f(u.photoOn, 0);
+    gl.uniform1f(u.skin, 1);
+    photoDraw = 0;
     for (const body of leaving) {
       // Aim is dropped: the pointer is a column away by now, and letting the body
       // on its way out lean after it is the sideways pull this is meant to be
@@ -473,6 +549,38 @@ export function createBlobRenderer(canvas: HTMLCanvasElement): BlobRenderer | nu
     }
 
     const unit = eased.unit || eased.width / 2;
+    // The photograph is in the cell the body is filling: its rect is the one the body is
+    // clipped to, and where the strip stands says how much of the liquid is there.
+    const photoOn =
+      photoTex.length >= 2 &&
+      photoVis > 0 &&
+      target.docked &&
+      target.dockFillWidth != null &&
+      target.dockFillHeight != null;
+    if (present && photoOn) {
+      const pw = target.dockFillWidth!;
+      const ph = target.dockFillHeight!;
+      const last = photoTex.length - 1;
+      const pos = Math.min(last, Math.max(0, target.photoPos));
+      const i = Math.min(last - 1, Math.floor(pos));
+      const t = pos - i;
+      const peak = Math.sin(Math.PI * t) ** 2;
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, photoTex[i]);
+      gl.activeTexture(gl.TEXTURE1);
+      gl.bindTexture(gl.TEXTURE_2D, photoTex[i + 1]);
+      gl.uniform1f(u.photoOn, 1);
+      gl.uniform1f(u.photoVis, photoVis);
+      gl.uniform1f(u.phAspect, photoAspect);
+      gl.uniform2f(u.cellOrigin, (dockX - pw / 2) * dpr, (cssH - (dockY + ph / 2)) * dpr);
+      gl.uniform2f(u.cellSize, pw * dpr, ph * dpr);
+      gl.uniform1f(u.t, t);
+      gl.uniform1f(u.peak, peak);
+      // Flat on an entry, so the photograph is simply itself; the skin comes up with the
+      // crossing, and up the whole way while the photograph is still arriving over it.
+      gl.uniform1f(u.skin, 1 + (Math.min(1, peak / 0.6) - 1) * photoVis);
+      photoDraw = photoVis;
+    }
     if (present)
       drawBody(
         eased,
@@ -529,8 +637,9 @@ export function createBlobRenderer(canvas: HTMLCanvasElement): BlobRenderer | nu
     // units is just the column's aspect ratio. Docked, the unit shrinks instead and
     // the pillar extent no longer matters — the body is a cube by then.
     const unit = body.unit || body.width / 2;
+    const overflowY = OVERFLOW_Y + (OVERFLOW_Y_PHOTO - OVERFLOW_Y) * photoDraw;
     const halfY = Math.max(
-      ((body.height / 2) / (body.width / 2)) * OVERFLOW_Y,
+      ((body.height / 2) / (body.width / 2)) * overflowY,
       CUBE_HALF,
     );
 
@@ -539,7 +648,7 @@ export function createBlobRenderer(canvas: HTMLCanvasElement): BlobRenderer | nu
     gl.uniform1f(u.unit, unit * dpr);
     gl.uniform2f(u.clip, clipL * dpr, clipR * dpr);
     gl.uniform2f(u.clipY, (cssH - clipBottom) * dpr, (cssH - clipTop) * dpr);
-    gl.uniform3f(u.half, HALF_X, halfY, HALF_Z);
+    gl.uniform3f(u.half, HALF_X + (HALF_X_PHOTO - HALF_X) * photoDraw, halfY, HALF_Z);
     gl.uniform1f(u.fade, fade);
     gl.uniform1f(u.cube, body.cube);
     gl.uniform2f(u.aim, aimX, aimY);
@@ -559,9 +668,11 @@ export function createBlobRenderer(canvas: HTMLCanvasElement): BlobRenderer | nu
 
   return {
     target,
+    setPhotos,
     wake,
     destroy() {
       if (raf) cancelAnimationFrame(raf);
+      for (const t of photoTex) gl.deleteTexture(t);
       gl.deleteProgram(program);
       gl.getExtension("WEBGL_lose_context")?.loseContext();
     },

@@ -59,55 +59,14 @@ a {
 /* ---------------------------- changing experience ----------------------------
    The wheel does not trigger a change, it drags one. `--p` is the position in the
    list as a fraction — 1.4 is forty percent of the way from the second experience
-   to the third — and every picture is placed from it, so the whole strip follows the
-   hand and stops where the hand stopped. Nothing rounds it: 1.4 is a resting place
-   like any other, with two half photographs in the window.
+   to the third — and everything that changes between entries is read off it, so the
+   whole thing follows the hand and stops where the hand stopped. Nothing rounds it:
+   1.4 is a resting place like any other.
 
-   The spacing is what sets how much white passes between two pictures, and it is set
-   by the furthest a neighbour has to go to be out of the window. The strip no longer
-   rests in the middle of the page but on the middle of the block of words, lower down,
-   so the two edges are no longer symmetric: the one above has to clear --rest, the one
-   below has to clear what is left underneath. Whichever is further governs, and 60% of
-   a frame carries the rest of it past the edge with a little to spare.
-
-   Below that a neighbour is already showing when the list is settled on an entry. */
-.frame-layer {
-  position: absolute;
-  inset: 0;
-  /* How far this picture is from home, in gaps and never negative — `max` of the
-     difference and its negative, since CSS has no absolute value everywhere yet. */
-  --from-home: max(var(--i) - var(--p, 0), var(--p, 0) - var(--i));
-  transform: translateY(
-    calc(
-      (var(--i) - var(--p, 0)) *
-        (max(var(--rest, 50vh), 100vh - var(--rest, 50vh)) + 60%)
-    )
-  );
-  /* Only the picture that is home is fully there. Anywhere else it is at half, and the
-     half in between is spent over the first half of a gap: by the time a picture is
-     half way out of the frame it has given up all of it, and the one arriving has taken
-     it all back over the same distance. So a crossing reads as one picture handing the
-     light to the next rather than as two pictures sliding.
-
-     Read off `--p`, not switched on it. There is no transition here and nothing to fire
-     at the moment an entry changes: the position moves every frame and the opacity is
-     a function of it, so it is as smooth as the movement is and it stops when the hand
-     stops. Which also means a strip left to rest between two entries is honest about
-     it: half a gap out is where the half is spent, so both pictures are down at 50% and
-     neither of them claims to be the one being looked at. */
-  opacity: calc(1 - 0.5 * clamp(0, var(--from-home) / 0.5, 1));
-  /* And the colour on the same clock, over the same half a gap: a picture in transit is
-     grey, and it takes its colour back only as it comes home. Read off `--p` like the
-     light is, so the two are one movement — the entry being looked at is the only one in
-     colour, and the fraction of colour a neighbour has is the fraction of the way it has
-     come.
-
-     Where the two differ is at the far end. The light stops at a half because a picture
-     being dragged has to stay a thing you can see; the colour goes all the way out,
-     because a grey photograph is still a photograph and there is nothing to lose by it.
-     So the grey is what carries the crossing and the light merely dims. */
-  filter: grayscale(clamp(0, var(--from-home) / 0.5, 1));
-}
+   The photographs are not in this stylesheet. They are one canvas (RefractionStrip),
+   painted from the same position by script, because what a crossing does to them —
+   warp, split the colour, dissolve one into the next — is not something CSS can say.
+   What is left here is the wording, which rides the same figure. */
 
 /* The wording, on the pictures' clock rather than on one of its own. Same `--p`, same
    half a gap, same shape — so the words leave as the picture naming them leaves, and
