@@ -210,6 +210,30 @@ const ENTRIES: Record<string, Entry[]> = {
 };
 
 /**
+ * A list's photographs, loaded once and kept: they go to the renderer as textures every
+ * time its section opens, and decoding six of them again each time would be the wait.
+ */
+const photoCache = new Map<string, Promise<HTMLImageElement[]>>();
+const loadPhotos = (name: string) => {
+  let hit = photoCache.get(name);
+  if (!hit) {
+    hit = Promise.all(
+      (ENTRIES[name] ?? []).map(
+        (e) =>
+          new Promise<HTMLImageElement>((resolve, reject) => {
+            const img = new window.Image();
+            img.onload = () => resolve(img);
+            img.onerror = reject;
+            img.src = e.image.src;
+          }),
+      ),
+    );
+    photoCache.set(name, hit);
+  }
+  return hit;
+};
+
+/**
  * The sections whose aside is simply a phrase, by name. The ones that are a list get a
  * counter there instead, worked out from the list itself; a section named here has no list
  * and says something in the same place.
@@ -286,14 +310,20 @@ const reelWind = (wound: number[], from: number, to: number) => {
   });
 };
 
-/** Wheel delta that amounts to one whole experience. */
-const SCROLL_PER_ENTRY = 500;
+/**
+ * Wheel delta that amounts to one whole experience. A crossing is where the photograph
+ * turns to liquid and back, so this is also how long that takes under the hand: it was
+ * 500, and the liquid came and went in a few notches of the wheel.
+ */
+const SCROLL_PER_ENTRY = 900;
 /**
  * Fraction of the distance to the target still left after a second. The position
  * chases the wheel rather than matching it, which is where the smoothness comes
- * from; the same frame-rate-independent easing the renderer uses.
+ * from; the same frame-rate-independent easing the renderer uses. It was 0.0009, which
+ * closes nine tenths of the gap in a third of a second; at 0.01 that is half a second, so
+ * the liquid is seen going rather than cut to.
  */
-const SCROLL_SMOOTH = 0.0009;
+const SCROLL_SMOOTH = 0.01;
 /**
  * Where the counter turns, as how far the arriving picture still has to travel before
  * it is home — in gaps, so 0.1 is a tenth of the way short of it: around fifty
@@ -339,15 +369,6 @@ const TITLE_LINE = 60;
     used to share with it before they moved into the grid, kept here since Contact
     still uses the plain title-container layout the figure was sized for. */
 const BLOCK_H = 278;
-
-/**
- * What to tell the browser about the width of a photograph in its grid cell. The cell
- * is roughly half the content width between the margins (a `1fr` track alongside
- * prose's own `1fr`), so this is an approximation rather than a figure read off the
- * grid's own numbers — good enough for the browser's own picking between the
- * photographs' existing responsive breakpoints, not a layout-affecting value itself.
- */
-const IMAGE_SIZES = "45vw";
 
 /**
  * How far the foot of the page sits above the bottom edge. It is the columns' own
@@ -538,6 +559,8 @@ export function LiquidColumns() {
 
   /** Where the list actually is, and where the wheel has asked it to go. */
   const at = useRef(0);
+  // When the photograph is to arrive in the cell, once the cube has filled it.
+  const photoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const want = useRef(0);
   const rafId = useRef(0);
 
@@ -564,6 +587,8 @@ export function LiquidColumns() {
       if (!el) return;
       const p = at.current;
       el.style.setProperty("--p", p.toFixed(4));
+      // The photograph is drawn by the body itself, which reads the position from here.
+      if (renderer.current) renderer.current.target.photoPos = p;
       // Which entry the strip has settled on, read from where the pictures are and
       // from nothing else. A picture takes the text over once it is within HANDOVER
       // of home; anywhere between two of them the last one to arrive holds, which is
@@ -851,6 +876,8 @@ export function LiquidColumns() {
 
     if (GRID_SECTIONS.has(COLUMNS[opened])) {
       setImageVisible(false);
+      if (photoTimer.current) clearTimeout(photoTimer.current);
+      if (renderer.current) renderer.current.target.photoVisible = false;
       stageTimer.current = setTimeout(() => {
         const r = renderer.current;
         if (r) {
@@ -956,6 +983,20 @@ export function LiquidColumns() {
     r.target.crystal = true;
     openedRef.current = hovered.current;
     const isGrid = GRID_SECTIONS.has(COLUMNS[hovered.current]);
+    // Experience and Projects carry photographs in the liquid: hand them over now, so
+    // they are textures by the time the cube has grown to fill the cell.
+    const section = COLUMNS[hovered.current];
+    r.target.photoVisible = false;
+    r.target.photoPos = 0;
+    if (photoTimer.current) clearTimeout(photoTimer.current);
+    r.setPhotos(null);
+    if (ENTRIES[section]) {
+      loadPhotos(section).then((imgs) => {
+        if (renderer.current && COLUMNS[openedRef.current ?? -1] === section) {
+          renderer.current.setPhotos(imgs);
+        }
+      });
+    }
     setOpened(hovered.current);
     // A section always opens on its first entry, and on it already: the counter mounts
     // with its strips already wound to it and nothing to transition from. It simply
@@ -993,6 +1034,14 @@ export function LiquidColumns() {
           if (rr) {
             rr.target.crystal = false;
             rr.wake();
+          }
+          // Once it has finished growing, the photograph comes into the liquid — on the
+          // same beat the title starts typing and the rest of the grid arrives.
+          if (ENTRIES[COLUMNS[openedRef.current ?? -1]]) {
+            if (photoTimer.current) clearTimeout(photoTimer.current);
+            photoTimer.current = setTimeout(() => {
+              if (renderer.current) renderer.current.target.photoVisible = true;
+            }, FILL_MS);
           }
         } else {
           setParked(true);
@@ -1065,21 +1114,16 @@ export function LiquidColumns() {
       (PHRASE[COLUMNS[opened]] ?? null)
     );
 
-  /** The strip of photographs, laid out from `--p`. The alt text belongs to the picture
-      that is actually being shown, so only that one carries it. */
-  const strip = (items: Entry[]) =>
-    items.map((item, i) => (
-      <div key={i} className="frame-layer" style={{ "--i": i } as React.CSSProperties}>
-        <Image
-          src={item.image}
-          alt={i === entry.index ? item.imageAlt : ""}
-          fill
-          sizes={IMAGE_SIZES}
-          placeholder="blur"
-          className="object-cover"
-        />
-      </div>
-    ));
+  /** The photographs are drawn by the liquid body itself, filling this cell, so there is
+      nothing here to see: only the description, for whoever cannot. It belongs to the
+      entry the counter is on. */
+  const strip = (items: Entry[]) => (
+    <div
+      role="img"
+      aria-label={items[entry.index].imageAlt}
+      className="absolute inset-0"
+    />
+  );
 
   /**
    * The entry the words are on.
